@@ -32,17 +32,20 @@ class ChromeHistoryReader(BaseReader):
             )
 
         history_db_path = os.path.join(chrome_profile_path, "History")
-        temp_db_path = "/tmp/leann_history_index_copy"
 
         if not os.path.exists(history_db_path):
             print(f"⚠️ Browser history database not found at: {history_db_path}")
             return docs
 
+        source_conn = None
+        conn = None
         try:
-            # Create a temporary copy to avoid "database is locked"
-            shutil.copy2(history_db_path, temp_db_path)
-
-            conn = sqlite3.connect(temp_db_path)
+            # SQLite's backup API captures committed rows from the main database and its WAL
+            # while keeping the live browser database untouched.
+            source_uri = f"{Path(history_db_path).resolve().as_uri()}?mode=ro"
+            source_conn = sqlite3.connect(source_uri, uri=True)
+            conn = sqlite3.connect(":memory:")
+            source_conn.backup(conn)
             cursor = conn.cursor()
 
             query = """
@@ -77,15 +80,14 @@ class ChromeHistoryReader(BaseReader):
                 doc = Document(text=doc_content, metadata={"title": title[0:150], "url": url})
                 docs.append(doc)
 
-            conn.close()
-            if os.path.exists(temp_db_path):
-                os.remove(temp_db_path)
-
         except Exception as e:
             print(f"❌ Error reading browser history: {e}")
-            if os.path.exists(temp_db_path):
-                os.remove(temp_db_path)
             return docs
+        finally:
+            if conn is not None:
+                conn.close()
+            if source_conn is not None:
+                source_conn.close()
 
         return docs
 
