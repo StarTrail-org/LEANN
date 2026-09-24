@@ -218,7 +218,9 @@ class FileSynchronizer:
             path = Path(file_path).resolve()
             if not path.is_file():
                 continue
-            if not self.include_hidden and _path_has_hidden_segment(path):
+            # A file named on its own is judged by its own name, not by its
+            # ancestors: pointing at a directory already overrides their hidden-ness.
+            if not self.include_hidden and path.name.startswith("."):
                 continue
             if not _extension_allowed(path, self.include_extensions):
                 continue

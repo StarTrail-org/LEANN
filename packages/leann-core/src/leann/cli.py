@@ -1673,7 +1673,10 @@ Examples:
                 files_by_dir = defaultdict(list)
                 for file_path in files:
                     file_path_obj = Path(file_path)
-                    if not include_hidden and _path_has_hidden_segment(file_path_obj):
+                    # Judge an explicitly named file by its own name: testing every
+                    # ancestor made the result depend on whether the user typed a
+                    # relative or an absolute path.
+                    if not include_hidden and file_path_obj.name.startswith("."):
                         print(f"  ⚠️  Skipping hidden file: {file_path}")
                         continue
                     parent_dir = str(file_path_obj.parent)
