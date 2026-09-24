@@ -703,16 +703,21 @@ class LeannBuilder:
 
         Args:
             index_path: Path where the index will be saved
-            ids: List of document IDs (will be converted to strings)
+            ids: Document IDs in embedding order. Converted to strings and used as
+                passage IDs even when add_text() assigned different IDs; chunk metadata
+                is preserved.
             embeddings: numpy array of shape (n_documents, embedding_dim)
 
         Raises:
-            ValueError: If ids and embeddings counts don't match, or dimension mismatch
+            ValueError: If IDs are duplicated, counts don't match, or dimensions differ
         """
         if len(ids) != embeddings.shape[0]:
             raise ValueError(
                 f"Mismatch between number of IDs ({len(ids)}) and embeddings ({embeddings.shape[0]})"
             )
+        string_ids = [str(id_val) for id_val in ids]
+        if len(string_ids) != len(set(string_ids)):
+            raise ValueError("Document IDs must be unique after conversion to strings")
 
         # Validate/set dimensions
         embedding_dim = embeddings.shape[1]
@@ -730,15 +735,18 @@ class LeannBuilder:
             # If no text chunks provided, create placeholder text entries
             if not self.chunks:
                 logger.info("No text chunks provided, creating placeholder entries...")
-                for id_val in ids:
+                for id_val in string_ids:
                     self.add_text(
                         f"Document {id_val}",
-                        metadata={"id": str(id_val), "from_embeddings": True},
+                        metadata={"id": id_val, "from_embeddings": True},
                     )
             else:
                 raise ValueError(
                     f"Number of text chunks ({len(self.chunks)}) doesn't match number of embeddings ({len(ids)})"
                 )
+
+        for chunk, string_id in zip(self.chunks, string_ids):
+            chunk["id"] = string_id
 
         # Build file structure
         path = Path(index_path)
@@ -769,7 +777,6 @@ class LeannBuilder:
             pickle.dump(offset_map, f)
 
         # Build the vector index using precomputed embeddings
-        string_ids = [str(id_val) for id_val in ids]
         # Persist ID map (order == embeddings order)
         try:
             idmap_file = (

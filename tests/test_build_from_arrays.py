@@ -3,13 +3,64 @@ Tests for LeannBuilder.build_index_from_arrays and its integration with
 build_index_from_embeddings (pickle-based path).
 """
 
+import json
 import os
 import pickle
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
+
+
+def test_build_from_arrays_custom_ids_are_searchable(tmp_path, monkeypatch):
+    """Search resolves supplied IDs to the text added before the array build."""
+    from leann.api import BACKEND_REGISTRY, LeannBuilder, LeannSearcher
+
+    backend = Mock()
+    monkeypatch.setitem(BACKEND_REGISTRY, "array-test", backend)
+    index_path = str(tmp_path / "custom-ids.leann")
+    ids = ["doc-a", "doc-b"]
+    embeddings = np.array([[1, 0], [0, 1]], dtype=np.float32)
+
+    builder = LeannBuilder(backend_name="array-test", dimensions=2)
+    builder.add_text("Alpha document", metadata={"id": "original-a", "source": "alpha"})
+    builder.add_text("Beta document", metadata={"source": "beta"})
+    builder.build_index_from_arrays(index_path, ids, embeddings)
+
+    assert backend.builder.return_value.build.call_args.args[1] == ids
+    with open(f"{index_path}.passages.jsonl", encoding="utf-8") as f:
+        assert [json.loads(line)["id"] for line in f] == ids
+    with open(f"{index_path}.passages.idx", "rb") as f:
+        assert set(pickle.load(f)) == set(ids)
+
+    backend.searcher.return_value.compute_query_embedding.return_value = embeddings[0]
+    backend.searcher.return_value.search.return_value = {
+        "labels": [ids],
+        "distances": [[0.9, 0.8]],
+    }
+    with LeannSearcher(index_path, enable_warmup=False, recompute_embeddings=False) as searcher:
+        results = searcher.search("document", top_k=2)
+
+    assert [(result.id, result.text, result.metadata["source"]) for result in results] == [
+        ("doc-a", "Alpha document", "alpha"),
+        ("doc-b", "Beta document", "beta"),
+    ]
+    assert results[0].metadata["id"] == "original-a"
+
+
+def test_build_from_arrays_rejects_colliding_ids(tmp_path, monkeypatch):
+    """Numeric and text IDs that become identical strings cannot share a passage."""
+    from leann.api import BACKEND_REGISTRY, LeannBuilder
+
+    monkeypatch.setitem(BACKEND_REGISTRY, "array-test", Mock())
+    builder = LeannBuilder(backend_name="array-test", dimensions=2)
+    with pytest.raises(ValueError, match="IDs must be unique"):
+        builder.build_index_from_arrays(
+            str(tmp_path / "colliding-ids.leann"), [1, "1"], np.zeros((2, 2), dtype=np.float32)
+        )
+    assert not (tmp_path / "colliding-ids.leann.passages.jsonl").exists()
 
 
 @pytest.mark.skipif(
