@@ -4,8 +4,13 @@ import argparse
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 _base_dir: str | None = None
+
+
+def _working_dir() -> Path:
+    return Path(_base_dir) if _base_dir else Path.cwd()
 
 
 def _leann_cmd() -> list[str]:
@@ -30,6 +35,7 @@ def _run_leann(*args, timeout=120):
         encoding="utf-8",
         errors="replace",
         timeout=timeout,
+        cwd=_working_dir(),
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -230,9 +236,8 @@ def handle_build(request_id, args):
     # updates use the same model (avoids mismatch with CLI default).
     if index_name:
         import json as _json
-        from pathlib import Path
 
-        meta_path = Path.cwd() / ".leann" / "indexes" / index_name / "documents.leann.meta.json"
+        meta_path = _working_dir() / ".leann" / "indexes" / index_name / "documents.leann.meta.json"
         if meta_path.exists():
             try:
                 with open(meta_path, encoding="utf-8") as f:
@@ -259,10 +264,8 @@ def handle_status(request_id, args):
     if not index_name:
         return _make_result(request_id, "Error: index_name is required.")
 
-    from pathlib import Path
-
     # Check standard location
-    leann_dir = Path.cwd() / ".leann" / "indexes" / index_name
+    leann_dir = _working_dir() / ".leann" / "indexes" / index_name
     meta_path = leann_dir / "documents.leann.meta.json"
     passages_path = leann_dir / "documents.leann.passages.jsonl"
 
