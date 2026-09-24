@@ -177,7 +177,7 @@ ollama list
 
 Try with a smaller dataset:
 ```bash
---max-items 1000
+--max-count 1000
 ```
 
 ## Advanced Usage

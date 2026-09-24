@@ -179,7 +179,7 @@ ollama list
 
 C: Daha küçük bir dataset ile test edin:
 ```bash
---max-items 1000
+--max-count 1000
 ```
 
 ## İleri Düzey Kullanım
