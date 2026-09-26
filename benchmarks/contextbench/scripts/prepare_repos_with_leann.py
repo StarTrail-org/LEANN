@@ -33,9 +33,7 @@ LEANN_SOURCE_EXTENSIONS = os.environ.get(
     "py,go,js,jsx,ts,tsx,java,kt,kts,rs,rb,php,cs,c,cc,cpp,h,hpp,m,mm,swift,scala,sh,sql,lua,r",
 )
 
-# LEANN index build parameters — override via env vars for sweeping configs.
-# ast-chunk-size is in non-whitespace CHARACTERS (not tokens). bge-base-en-v1.5
-# has a 512-token limit; at ~1.2 tokens/char: 300 chars + 64 overlap ≈ 436 tokens.
+# LEANN index build parameters
 LEANN_EMBEDDING_MODEL = os.environ.get(
     "LEANN_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code"
 )
@@ -75,37 +73,37 @@ SELECTED_IDS: list[str] = [
     # "SWE-Bench-Pro__python__maintenance__bugfix__3cfd9a02",
     # "SWE-Bench-Pro__python__maintenance__bugfix__4c132bfd",
     # "SWE-Bench-Pro__python__maintenance__bugfix__7c2efe8a",
-    "SWE-Bench-Pro__go__maintenance__bugfix__40a717e5",
-    "SWE-Bench-Pro__go__maintenance__bugfix__52d866b3",
-    "SWE-Bench-Pro__go__maintenance__bugfix__720b4d92",
-    "SWE-Bench-Pro__go__maintenance__bugfix__997c7afd",
-    "SWE-Bench-Pro__javascript__maintenance__bugfix__82518720",
-    "SWE-Bench-Pro__javascript__maintenance__bugfix__e31ec45c",
-    "SWE-Bench-Pro__python__maintenance__bugfix__07bb383a",
-    "SWE-Bench-Pro__python__maintenance__bugfix__0bac5789",
-    "SWE-Bench-Pro__python__maintenance__bugfix__18d7bbbc",
-    "SWE-Bench-Pro__python__maintenance__bugfix__1cf3e889",
-    "SWE-Bench-Pro__python__maintenance__bugfix__20dad82b",
-    "SWE-Bench-Pro__python__maintenance__bugfix__20f502e0",
-    "SWE-Bench-Pro__python__maintenance__bugfix__509a20d9",
-    "SWE-Bench-Pro__python__maintenance__bugfix__53ca6a30",
-    "SWE-Bench-Pro__python__maintenance__bugfix__552343cd",
-    "SWE-Bench-Pro__python__maintenance__bugfix__5b2cf9bb",
-    "SWE-Bench-Pro__python__maintenance__bugfix__66e05eaa",
-    "SWE-Bench-Pro__python__maintenance__bugfix__6ebb54dc",
-    "SWE-Bench-Pro__python__maintenance__bugfix__87bfb374",
-    "SWE-Bench-Pro__python__maintenance__bugfix__89932d58",
-    "SWE-Bench-Pro__python__maintenance__bugfix__942d0b14",
-    "SWE-Bench-Pro__python__maintenance__bugfix__983f2896",
-    "SWE-Bench-Pro__python__maintenance__bugfix__a984b409",
-    "SWE-Bench-Pro__python__maintenance__bugfix__aa07d0c3",
-    "SWE-Bench-Pro__python__maintenance__bugfix__cf01f471",
-    "SWE-Bench-Pro__python__maintenance__bugfix__d2506f10",
-    "SWE-Bench-Pro__python__maintenance__bugfix__e579f2f0",
-    "SWE-Bench-Pro__python__maintenance__bugfix__eafb1f0b",
-    "SWE-Bench-Pro__python__maintenance__bugfix__ef8756b1",
-    "SWE-Bench-Pro__python__maintenance__bugfix__f87209f8",
-    "SWE-Bench-Pro__python__maintenance__bugfix__ff79bafd",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__40a717e5",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__52d866b3",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__720b4d92",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__997c7afd",
+    # "SWE-Bench-Pro__javascript__maintenance__bugfix__82518720",
+    # "SWE-Bench-Pro__javascript__maintenance__bugfix__e31ec45c",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__07bb383a",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__0bac5789",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__18d7bbbc",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__1cf3e889",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__20dad82b",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__20f502e0",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__509a20d9",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__53ca6a30",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__552343cd",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__5b2cf9bb",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__66e05eaa",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__6ebb54dc",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__87bfb374",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__89932d58",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__942d0b14",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__983f2896",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__a984b409",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__aa07d0c3",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__cf01f471",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__d2506f10",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__e579f2f0",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__eafb1f0b",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__ef8756b1",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__f87209f8",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__ff79bafd",
 ]
 
 if os.environ.get("SELECTED_IDS"):
@@ -333,7 +331,7 @@ def build_leann_index(instance_id: str, repo_dir: Path) -> tuple[bool, Optional[
             env={
                 **os.environ,
                 "LEANN_EMBEDDING_DEVICE": os.environ.get("LEANN_EMBEDDING_DEVICE", "mps"),
-                "LEANN_BATCH_SIZE": os.environ.get("LEANN_BATCH_SIZE", "32"),
+                "LEANN_BATCH_SIZE": os.environ.get("LEANN_BATCH_SIZE", "8"),
             },
         )
     except subprocess.TimeoutExpired:
@@ -454,8 +452,8 @@ def main():
             print(f"\n📝 Failure report written to: {report_path}")
     print("\nNext steps:")
     print(f"  1. Verify indexes: ls {WORK_ROOT}/*/.leann")
-    print("  2. Run with LEANN: LEANN_ENABLED=1 python batch_run_selected.py")
-    print("  3. Baseline run:   LEANN_ENABLED=0 python batch_run_selected.py")
+    print("  2. Run with LEANN MCP: LEANN_MODE=mcp python batch_run_selected.py")
+    print("  3. Baseline run:      LEANN_MODE=none python batch_run_selected.py")
 
 
 if __name__ == "__main__":
