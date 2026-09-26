@@ -405,7 +405,7 @@ def test_stop_server_detaches_when_daemon_mode(monkeypatch):
         called["terminate"] += 1
         raise AssertionError("terminate should not be called in daemon detach path")
 
-    manager.server_process.terminate = fail_terminate  # type: ignore[method-assign]
+    manager.server_process.terminate = fail_terminate
 
     manager.stop_server()
     assert called["terminate"] == 0

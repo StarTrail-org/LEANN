@@ -45,12 +45,15 @@ _CJK_RUN = re.compile(f"[{_CJK_CHARACTERS}]+")
 def _fts5_cjk_ngrams(match: re.Match[str]) -> str:
     """Expand a CJK run into unigram and bigram tokens for SQLite FTS5."""
     text = match.group()
-    return " ".join([*text, *(text[i : i + 2] for i in range(len(text) - 1))])
+    tokens = " ".join([*text, *(text[i : i + 2] for i in range(len(text) - 1))])
+    # Keep adjacent non-CJK words separate from the first and last n-grams.
+    return f" {tokens} "
 
 
 def _fts5_cjk_query(query: str) -> str:
     """Build a safe FTS5 query that requires every CJK bigram in each term."""
-    tokens = re.findall(rf"[{_CJK_CHARACTERS}]+|\w+", query.lower())
+    # Unicode \w includes CJK, so exclude it from the non-CJK alternative.
+    tokens = re.findall(rf"[{_CJK_CHARACTERS}]+|[^\W{_CJK_CHARACTERS}]+", query.lower())
     terms = []
     for token in tokens:
         if _CJK_RUN.fullmatch(token):
