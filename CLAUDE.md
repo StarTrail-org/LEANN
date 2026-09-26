@@ -165,7 +165,7 @@ Requires Python 3.10+ (uses PEP 604 union syntax `X | Y`).
 ## Roadmap
 - Public roadmap: `docs/roadmap.md` — tracks P0/P1 priorities, completed milestones, and timeline.
 - Long-term vision: `docs/ultimate_goal.md` — the north star for where LEANN is headed.
-- Keep in sync with [GitHub issue #237](https://github.com/yichuan-w/LEANN/issues/237).
+- Keep in sync with [GitHub issue #237](https://github.com/StarTrail-org/LEANN/issues/237).
 - Welcome everyone to add more, and the craziest feature you want to put here! If people want some feature, all put there.
 
 ## Changelog (for contributors)
