@@ -4,14 +4,21 @@ import sqlite3
 import sys
 import types
 from pathlib import Path
+from typing import Any
+
+
+def _stub_module(name: str) -> Any:
+    """A stand-in module object whose attributes are set dynamically below."""
+    return types.ModuleType(name)
+
 
 try:
     from llama_index.core import Document as _Document
 except ModuleNotFoundError:
-    llama_index = types.ModuleType("llama_index")
-    llama_index_core = types.ModuleType("llama_index.core")
-    llama_index_readers = types.ModuleType("llama_index.core.readers")
-    llama_index_base = types.ModuleType("llama_index.core.readers.base")
+    llama_index = _stub_module("llama_index")
+    llama_index_core = _stub_module("llama_index.core")
+    llama_index_readers = _stub_module("llama_index.core.readers")
+    llama_index_base = _stub_module("llama_index.core.readers.base")
 
     class _Document:
         def __init__(self, text, metadata):

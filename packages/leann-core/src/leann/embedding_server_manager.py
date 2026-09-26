@@ -29,7 +29,7 @@ _REGISTRY_LOCKS_GUARD = threading.Lock()
 _REGISTRY_LOCKS: dict[str, threading.Lock] = {}
 
 
-def _flock_acquire(lock_file) -> None:  # type: ignore[type-arg]
+def _flock_acquire(lock_file) -> None:
     """Acquire an exclusive file lock for cross-process synchronisation.
 
     Uses ``fcntl.flock`` on POSIX and ``msvcrt.locking`` on Windows.  Both are
@@ -70,7 +70,7 @@ def _flock_acquire(lock_file) -> None:  # type: ignore[type-arg]
     )
 
 
-def _flock_release(lock_file) -> None:  # type: ignore[type-arg]
+def _flock_release(lock_file) -> None:
     """Release the file lock acquired by :func:`_flock_acquire`."""
     try:
         import fcntl
