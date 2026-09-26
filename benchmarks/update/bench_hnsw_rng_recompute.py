@@ -677,7 +677,7 @@ def main() -> None:
                     else max(second * 1.2, lower_cap * 1.02)
                 )
                 ymax = max(values) * 1.10 if values else 1.0
-                fig, (ax_top, ax_bottom) = plt.subplots(
+                _fig, (ax_top, ax_bottom) = plt.subplots(
                     2,
                     1,
                     sharex=True,

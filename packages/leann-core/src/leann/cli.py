@@ -6,6 +6,7 @@ import io
 import json
 import os
 import pickle
+import re
 import sys
 import time
 import uuid
@@ -1956,10 +1957,12 @@ Examples:
                     text = node.get_content()
                     # For code chunks, trim a partial first line left by overlap
                     # (a valid line starts with digits followed by '|')
-                    if is_code_file and text and not text[0].isdigit():
-                        first_nl = text.find("\n")
-                        if first_nl != -1:
-                            text = text[first_nl + 1 :]
+                    if is_code_file and text:
+                        first_line = text.split("\n", 1)[0]
+                        if "|" in first_line and not re.match(r"^\s*\d+\|", first_line):
+                            first_nl = text.find("\n")
+                            if first_nl != -1:
+                                text = text[first_nl + 1 :]
                     all_texts.append({"text": text, "metadata": chunk_metadata.copy()})
 
         print(f"Loaded {len(documents)} documents, {len(all_texts)} chunks")

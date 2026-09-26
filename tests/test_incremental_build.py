@@ -80,7 +80,7 @@ def test_file_synchronizer_detects_modification(tmp_path):
 
     (docs / "a.txt").write_text("changed", encoding="utf-8")
     fs2 = FileSynchronizer(root_dir=str(docs), snapshot_path=snapshot)
-    added, removed, modified = fs2.detect_changes()
+    added, _removed, modified = fs2.detect_changes()
     assert len(modified) == 1
     assert len(added) == 0
 

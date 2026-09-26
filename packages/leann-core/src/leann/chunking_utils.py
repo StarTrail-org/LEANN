@@ -4,6 +4,7 @@ Packaged within leann-core so installed wheels can import it reliably.
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -278,7 +279,16 @@ def create_ast_chunks(
                     # Merge document metadata + astchunk metadata
                     combined_metadata = {**doc_metadata, **astchunk_metadata}
 
-                    all_chunks.append({"text": chunk_text.strip(), "metadata": combined_metadata})
+                    # Trim partial first line left by overlap if using line numbers
+                    # (a valid line starts with digits followed by '|')
+                    stripped = chunk_text.strip()
+                    if stripped:
+                        first_line = stripped.split("\n", 1)[0]
+                        if "|" in first_line and not re.match(r"^\s*\d+\|", first_line):
+                            first_nl = stripped.find("\n")
+                            if first_nl != -1:
+                                stripped = stripped[first_nl + 1 :]
+                    all_chunks.append({"text": stripped, "metadata": combined_metadata})
 
             logger.info(
                 f"Created {len(chunks)} AST chunks from {language} file: {doc.metadata.get('file_name', 'unknown')}"

@@ -488,7 +488,7 @@ def main() -> None:
             _ = _search(index, q_emb, 1)
 
             t_s0 = time.time()
-            D_upd, I_upd = _search(index, q_emb, args.k)
+            _D_upd, _I_upd = _search(index, q_emb, args.k)
             search_after_add = time.time() - t_s0
             total_seq = time.time() - t0
         finally:

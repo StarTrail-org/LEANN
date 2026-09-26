@@ -418,17 +418,18 @@ class TestPromptTemplateFlowsToComputeEmbeddings:
         This is an integration test that verifies the complete flow:
         CLI → embedding_options → LeannBuilder → compute_embeddings(provider_options)
 
-        This test will fail because:
-        1. CLI doesn't capture the argument yet
-        2. embedding_options doesn't include prompt_template
-        3. LeannBuilder doesn't pass it through to compute_embeddings
+        Native backend graph construction is mocked: this test only asserts the
+        embedding provider_options wiring. Building a real HNSW graph with the
+        mocked 3-D embeddings is outside the scope of the prompt-template contract
+        and has been observed to abort the Linux CI process with exit 127.
         """
         # Mock compute_embeddings to return dummy embeddings as numpy array
         import numpy as np
 
         mock_compute_embeddings.return_value = np.array([[0.1, 0.2, 0.3]], dtype=np.float32)
 
-        # Use real LeannBuilder (not mocked) to test the actual flow
+        # Use real LeannBuilder (not mocked) to test the actual embedding_options flow.
+        # Stub only the native backend build + optional BM25 side effects.
         cli = LeannCLI()
 
         # Mock load_documents to return a simple document
@@ -451,28 +452,46 @@ class TestPromptTemplateFlowsToComputeEmbeddings:
             ]
         )
 
-        # This should fail because the flow isn't implemented yet
         import asyncio
+        from unittest.mock import MagicMock
 
-        asyncio.run(cli.build_index(args))
+        mock_builder_instance = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.builder = MagicMock(return_value=mock_builder_instance)
+
+        # Avoid native HNSW graph build / BM25 side-effects; this test only
+        # asserts CLI → LeannBuilder → compute_embeddings(provider_options).
+        cli.register_project_dir = Mock()  # type: ignore[method-assign]
+        with patch.dict("leann.api.BACKEND_REGISTRY", {"hnsw": mock_factory}, clear=False):
+            with patch("leann.api.Fts5BM25Index") as mock_bm25_cls:
+                mock_bm25_cls.return_value = MagicMock()
+                asyncio.run(cli.build_index(args))
 
         # Verify compute_embeddings was called with provider_options containing prompt_template
         assert mock_compute_embeddings.called, "compute_embeddings should have been called"
 
-        # Check the call arguments
-        call_kwargs = mock_compute_embeddings.call_args.kwargs
-        assert "provider_options" in call_kwargs, (
+        # Prefer kwargs; fall back to inspecting all calls (positional vs keyword)
+        provider_options = None
+        for call in mock_compute_embeddings.call_args_list:
+            if call.kwargs.get("provider_options") is not None:
+                provider_options = call.kwargs["provider_options"]
+                break
+            # provider_options may be passed positionally depending on call site
+            if len(call.args) >= 5 and isinstance(call.args[4], dict):
+                provider_options = call.args[4]
+                break
+
+        assert provider_options is not None, (
             "compute_embeddings should receive provider_options parameter"
         )
-
-        provider_options = call_kwargs["provider_options"]
-        assert provider_options is not None, "provider_options should not be None"
         assert "prompt_template" in provider_options, (
             "provider_options should contain prompt_template key"
         )
         assert provider_options["prompt_template"] == template, (
             f"Template should be '{template}', got {provider_options.get('prompt_template')}"
         )
+        # Native build should have been invoked with the mocked embeddings
+        mock_builder_instance.build.assert_called()
 
 
 class TestPromptTemplateArgumentHelp:
