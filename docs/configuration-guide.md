@@ -52,7 +52,7 @@ Based on our experience developing LEANN, embedding models fall into three categ
 ### Quick Start: Cloud and Local Embedding Options
 
 **OpenAI Embeddings (Fastest Setup)**
-For immediate testing without local model downloads(also if you [do not have GPU](https://github.com/yichuan-w/LEANN/issues/43) and do not care that much about your document leak, you should use this, we compute the embedding and recompute using openai API):
+For immediate testing without local model downloads(also if you [do not have GPU](https://github.com/StarTrail-org/LEANN/issues/43) and do not care that much about your document leak, you should use this, we compute the embedding and recompute using openai API):
 ```bash
 # Set OpenAI embeddings (requires OPENAI_API_KEY)
 --embedding-mode openai --embedding-model text-embedding-3-small
@@ -157,7 +157,7 @@ leann ask my-notes \
 - Configure router or cloud provider port forwarding.
 - Tunnel traffic through tools like `tailscale`, `cloudflared`, or `ssh -R`.
 
-When you set these options while building an index, LEANN stores them in `meta.json`. Any subsequent `leann ask` or searcher process automatically reuses the same provider settings – even when we spawn background embedding servers. This makes the “server without GPU talking to my local workstation” workflow from [issue #80](https://github.com/yichuan-w/LEANN/issues/80#issuecomment-2287230548) work out-of-the-box.
+When you set these options while building an index, LEANN stores them in `meta.json`. Any subsequent `leann ask` or searcher process automatically reuses the same provider settings – even when we spawn background embedding servers. This makes the “server without GPU talking to my local workstation” workflow from [issue #80](https://github.com/StarTrail-org/LEANN/issues/80#issuecomment-2287230548) work out-of-the-box.
 
 **Tip:** If your runtime does not require an API key (many local stacks don’t), leave `--api-key` unset. LEANN will skip injecting credentials.
 

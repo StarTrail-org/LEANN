@@ -1,7 +1,7 @@
 # llms.txt — LEANN MCP and Agent Integration
 product: LEANN
-homepage: https://github.com/yichuan-w/LEANN
-contact: https://github.com/yichuan-w/LEANN/issues
+homepage: https://github.com/StarTrail-org/LEANN
+contact: https://github.com/StarTrail-org/LEANN/issues
 
 # Installation
 install: uv tool install leann-core --with leann

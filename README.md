@@ -4,13 +4,13 @@
 
 <p align="center">
   <a href="https://trendshift.io/repositories/15049" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/15049" alt="yichuan-w/LEANN | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
+    <img src="https://trendshift.io/api/badge/repositories/15049" alt="StarTrail-org/LEANN | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
   </a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg" alt="Python Versions">
-  <img src="https://github.com/yichuan-w/LEANN/actions/workflows/build-and-publish.yml/badge.svg" alt="CI Status">
+  <img src="https://github.com/StarTrail-org/LEANN/actions/workflows/build-and-publish.yml/badge.svg" alt="CI Status">
   <img src="https://img.shields.io/badge/Platform-Ubuntu%20%26%20Arch%20%26%20WSL%20%7C%20macOS%20(ARM64%2FIntel)%20%7C%20Windows-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/MCP-Native%20Integration-blue" alt="MCP Integration">
@@ -36,7 +36,7 @@
   <p>
     We'd love for you to be part of the LEANN community!<br>
     👉 <a href="https://join.slack.com/t/leann-e2u9779/shared_invite/zt-3ol2ww9ic-Eg_kB8omwe6xmYVd0epr4Q"><b>Join LEANN Slack</b></a><br>
-    If the invite link has expired or you have trouble joining, please <a href="https://github.com/yichuan-w/LEANN/issues">open an issue</a> and we'll help you get in!
+    If the invite link has expired or you have trouble joining, please <a href="https://github.com/StarTrail-org/LEANN/issues">open an issue</a> and we'll help you get in!
   </p>
 </div>
 
@@ -104,7 +104,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Clone the repository to access all examples and try amazing applications,
 
 ```bash
-git clone https://github.com/yichuan-w/LEANN.git leann
+git clone https://github.com/StarTrail-org/LEANN.git leann
 cd leann
 ```
 
@@ -131,7 +131,7 @@ uv pip install leann
 
 
 ```bash
-git clone https://github.com/yichuan-w/LEANN.git leann
+git clone https://github.com/StarTrail-org/LEANN.git leann
 cd leann
 git submodule update --init --recursive
 ```
@@ -147,7 +147,7 @@ uv sync --extra diskann
 
 **Linux (Ubuntu/Debian):**
 
-Note: On Ubuntu 20.04, you may need to build a newer Abseil and pin Protobuf (e.g., v3.20.x) for building DiskANN. See [Issue #30](https://github.com/yichuan-w/LEANN/issues/30) for a step-by-step note.
+Note: On Ubuntu 20.04, you may need to build a newer Abseil and pin Protobuf (e.g., v3.20.x) for building DiskANN. See [Issue #30](https://github.com/StarTrail-org/LEANN/issues/30) for a step-by-step note.
 
 You can manually install [Intel oneAPI MKL](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html) instead of `libmkl-full-dev` for DiskANN. You can also use `libopenblas-dev` for building HNSW only, by removing `--extra diskann` in the command below.
 
@@ -178,7 +178,7 @@ uv sync --extra diskann
 
 **Linux (RHEL / CentOS Stream / Oracle / Rocky / AlmaLinux):**
 
-See [Issue #50](https://github.com/yichuan-w/LEANN/issues/50) for more details.
+See [Issue #50](https://github.com/StarTrail-org/LEANN/issues/50) for more details.
 
 ```bash
 sudo dnf groupinstall -y "Development Tools"
@@ -223,7 +223,7 @@ uv sync --extra diskann
 
 Our declarative API makes RAG as easy as writing a config file.
 
-Check out [demo.ipynb](demo.ipynb) or [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yichuan-w/LEANN/blob/main/demo.ipynb)
+Check out [demo.ipynb](demo.ipynb) or [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/StarTrail-org/LEANN/blob/main/demo.ipynb)
 
 ```python
 from leann import LeannBuilder, LeannSearcher, LeannChat
@@ -1355,7 +1355,7 @@ This work is done at [**Berkeley Sky Computing Lab**](https://sky.cs.berkeley.ed
 
 ## Star History
 
-[![Star History Chart](https://star-history.dera.page/svg?repos=yichuan-w/LEANN&type=Date)](https://star-history.dera.page/#yichuan-w/LEANN&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=StarTrail-org/LEANN&type=Date)](https://star-history.dera.page/#StarTrail-org/LEANN&Date)
 <p align="center">
   <strong>⭐ Star us on GitHub if Leann is useful for your research or applications!</strong>
 </p>
@@ -1366,4 +1366,4 @@ This work is done at [**Berkeley Sky Computing Lab**](https://sky.cs.berkeley.ed
 
 ## 🤖 Explore LEANN with AI
 
-LEANN is indexed on [DeepWiki](https://deepwiki.com/yichuan-w/LEANN), so you can ask questions to LLMs using Deep Research to explore the codebase and get help to add new features.
+LEANN is indexed on [DeepWiki](https://deepwiki.com/StarTrail-org/LEANN), so you can ask questions to LLMs using Deep Research to explore the codebase and get help to add new features.
