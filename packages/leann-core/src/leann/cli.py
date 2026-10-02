@@ -24,6 +24,8 @@ from .settings import (
     resolve_anthropic_base_url,
     resolve_atlascloud_api_key,
     resolve_atlascloud_base_url,
+    resolve_cheaperinference_api_key,
+    resolve_cheaperinference_base_url,
     resolve_litellm_api_key,
     resolve_litellm_base_url,
     resolve_minimax_api_key,
@@ -719,6 +721,8 @@ Examples:
                 "atlascloud",
                 "atlas-cloud",
                 "atlas",
+                "cheaperinference",
+                "cheaper-inference",
             ],
             help="LLM provider (default: ollama)",
         )
@@ -805,6 +809,8 @@ Examples:
                 "atlascloud",
                 "atlas-cloud",
                 "atlas",
+                "cheaperinference",
+                "cheaper-inference",
             ],
             help="LLM provider (default: ollama)",
         )
@@ -3548,6 +3554,14 @@ Examples:
             resolved_api_key = resolve_atlascloud_api_key(args.api_key)
             if resolved_api_key:
                 llm_config["api_key"] = resolved_api_key
+        elif args.llm in {"cheaperinference", "cheaper-inference"}:
+            llm_config["type"] = "cheaperinference"
+            if args.model == "qwen3:8b":
+                llm_config["model"] = "gpt-5.4-mini"
+            llm_config["base_url"] = resolve_cheaperinference_base_url(args.api_base)
+            resolved_api_key = resolve_cheaperinference_api_key(args.api_key)
+            if resolved_api_key:
+                llm_config["api_key"] = resolved_api_key
 
         # Parse --metadata-filters JSON string (mirrors `leann search`).
         # Run before constructing LeannChat so invalid filters fail fast without
@@ -3850,6 +3864,14 @@ Examples:
                 llm_config["model"] = "deepseek-ai/deepseek-v4-pro"
             llm_config["base_url"] = resolve_atlascloud_base_url(args.api_base)
             resolved_api_key = resolve_atlascloud_api_key(args.api_key)
+            if resolved_api_key:
+                llm_config["api_key"] = resolved_api_key
+        elif args.llm in {"cheaperinference", "cheaper-inference"}:
+            llm_config["type"] = "cheaperinference"
+            if args.model == "qwen3:8b":
+                llm_config["model"] = "gpt-5.4-mini"
+            llm_config["base_url"] = resolve_cheaperinference_base_url(args.api_base)
+            resolved_api_key = resolve_cheaperinference_api_key(args.api_key)
             if resolved_api_key:
                 llm_config["api_key"] = resolved_api_key
 

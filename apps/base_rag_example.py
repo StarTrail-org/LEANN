@@ -32,6 +32,8 @@ try:
     from leann.settings import (
         resolve_atlascloud_api_key,
         resolve_atlascloud_base_url,
+        resolve_cheaperinference_api_key,
+        resolve_cheaperinference_base_url,
         resolve_litellm_api_key,
         resolve_litellm_base_url,
         resolve_ollama_host,
@@ -66,6 +68,16 @@ except ImportError:
             or os.getenv("ATLASCLOUD_BASE_URL")
             or os.getenv("ATLAS_CLOUD_BASE_URL")
             or "https://api.atlascloud.ai/v1"
+        )
+
+    def resolve_cheaperinference_api_key(value: str | None) -> str | None:
+        return value or os.getenv("CHEAPER_INFERENCE_API_KEY")
+
+    def resolve_cheaperinference_base_url(value: str | None) -> str | None:
+        return (
+            value
+            or os.getenv("CHEAPER_INFERENCE_BASE_URL")
+            or "https://api.cheaperinference.com/v1"
         )
 
 
@@ -169,8 +181,10 @@ class BaseRAGExample(ABC):
                 "atlascloud",
                 "atlas-cloud",
                 "atlas",
+                "cheaperinference",
+                "cheaper-inference",
             ],
-            help="LLM backend: openai, ollama, hf, litellm, atlascloud, or simulated (default: openai)",
+            help="LLM backend: openai, ollama, hf, litellm, atlascloud, cheaperinference, or simulated (default: openai)",
         )
         llm_group.add_argument(
             "--llm-model",
@@ -318,6 +332,13 @@ class BaseRAGExample(ABC):
             config["model"] = args.llm_model or "deepseek-ai/deepseek-v4-pro"
             config["base_url"] = resolve_atlascloud_base_url(args.llm_api_base)
             resolved_key = resolve_atlascloud_api_key(args.llm_api_key)
+            if resolved_key:
+                config["api_key"] = resolved_key
+        elif args.llm in {"cheaperinference", "cheaper-inference"}:
+            config["type"] = "cheaperinference"
+            config["model"] = args.llm_model or "gpt-5.4-mini"
+            config["base_url"] = resolve_cheaperinference_base_url(args.llm_api_base)
+            resolved_key = resolve_cheaperinference_api_key(args.llm_api_key)
             if resolved_key:
                 config["api_key"] = resolved_key
         elif args.llm == "ollama":

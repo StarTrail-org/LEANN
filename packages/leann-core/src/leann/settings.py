@@ -16,6 +16,7 @@ _DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 _DEFAULT_MINIMAX_BASE_URL = "https://api.minimax.io/v1"
 _DEFAULT_NOVITA_BASE_URL = "https://api.novita.ai/openai"
 _DEFAULT_ATLASCLOUD_BASE_URL = "https://api.atlascloud.ai/v1"
+_DEFAULT_CHEAPERINFERENCE_BASE_URL = "https://api.cheaperinference.com/v1"
 
 
 def _clean_url(value: str) -> str:
@@ -219,6 +220,31 @@ def resolve_atlascloud_api_key(explicit: str | None = None) -> str | None:
         return explicit
 
     return os.getenv("ATLASCLOUD_API_KEY") or os.getenv("ATLAS_CLOUD_API_KEY")
+
+
+def resolve_cheaperinference_base_url(explicit: str | None = None) -> str:
+    """Resolve the base URL for Cheaper Inference OpenAI-compatible services."""
+
+    candidates = (
+        explicit,
+        os.getenv("LEANN_CHEAPER_INFERENCE_BASE_URL"),
+        os.getenv("CHEAPER_INFERENCE_BASE_URL"),
+    )
+
+    for candidate in candidates:
+        if candidate:
+            return _clean_url(candidate)
+
+    return _clean_url(_DEFAULT_CHEAPERINFERENCE_BASE_URL)
+
+
+def resolve_cheaperinference_api_key(explicit: str | None = None) -> str | None:
+    """Resolve the API key for Cheaper Inference services."""
+
+    if explicit:
+        return explicit
+
+    return os.getenv("CHEAPER_INFERENCE_API_KEY")
 
 
 def encode_provider_options(options: dict[str, Any] | None) -> str | None:
