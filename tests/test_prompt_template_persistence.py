@@ -611,6 +611,10 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         searcher.use_daemon = False
         searcher.daemon_ttl_seconds = 0
 
+        # Initialize query cache for tests
+        searcher.query_cache = Mock()
+        searcher.query_cache.get.return_value = None
+
         # Mock compute_embeddings to capture the query text
         captured_queries = []
 
@@ -668,6 +672,10 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         searcher.enable_warmup = False
         searcher.use_daemon = False
         searcher.daemon_ttl_seconds = 0
+
+        # Initialize query cache for tests
+        searcher.query_cache = Mock()
+        searcher.query_cache.get.return_value = None
 
         # Mock the server methods to capture the query text
         captured_queries = []
@@ -728,6 +736,10 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         searcher.use_daemon = False
         searcher.daemon_ttl_seconds = 0
 
+        # Initialize query cache for tests
+        searcher.query_cache = Mock()
+        searcher.query_cache.get.return_value = None
+
         captured_queries = []
 
         def mock_compute_embeddings(texts, model, mode, provider_options=None):
@@ -780,6 +792,10 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         searcher.enable_warmup = False
         searcher.use_daemon = False
         searcher.daemon_ttl_seconds = 0
+
+        # Initialize query cache for tests
+        searcher.query_cache = Mock()
+        searcher.query_cache.get.return_value = None
 
         query_template = "task: search result | query: "
         original_query = "vector database"
@@ -858,6 +874,10 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         searcher.enable_warmup = False
         searcher.use_daemon = False
         searcher.daemon_ttl_seconds = 0
+
+        # Initialize query cache for tests
+        searcher.query_cache = Mock()
+        searcher.query_cache.get.return_value = None
 
         captured_queries = []
 

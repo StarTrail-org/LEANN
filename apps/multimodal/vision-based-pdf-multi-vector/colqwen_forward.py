@@ -71,7 +71,7 @@ def main():
     # Step 2: Load model
     print("\n[Step 2] Loading ColQwen2 model...")
     try:
-        model_name, model, processor, device_str, device, dtype = _load_colvision("colqwen2")
+        model_name, model, processor, device_str, _device, dtype = _load_colvision("colqwen2")
         print(f"✓ Model loaded: {model_name}")
         print(f"✓ Device: {device_str}, dtype: {dtype}")
 
