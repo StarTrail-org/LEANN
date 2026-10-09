@@ -979,8 +979,16 @@ class LeannBuilder:
                 continue
             metadata = chunk.setdefault("metadata", {})
             passage_id = chunk.get("id") or metadata.get("id")
-            if passage_id and passage_id in existing_ids:
+            # ``add_text()`` also stores a generated ID in ``chunk["id"]``, and under the
+            # sequential scheme that ID is this builder's insertion position -- it says
+            # nothing about the index being updated, so it must not be treated as taken.
+            positional_id = not metadata.get("id") and (
+                self.passage_id_scheme == PASSAGE_ID_SCHEME_SEQUENTIAL
+            )
+            if passage_id and not positional_id and passage_id in existing_ids:
                 raise ValueError(f"Passage ID '{passage_id}' already exists in the index.")
+            if positional_id:
+                chunk["id"] = None
             valid_chunks.append(chunk)
 
         if not valid_chunks:
@@ -990,6 +998,16 @@ class LeannBuilder:
                 json.dump(meta, f, indent=2)
             self.chunks.clear()
             return
+
+        next_id = 0
+        for chunk in valid_chunks:
+            if chunk["id"] is not None:
+                continue
+            while str(next_id) in existing_ids:
+                next_id += 1
+            chunk["id"] = str(next_id)
+            existing_ids.add(chunk["id"])
+            next_id += 1
 
         texts_to_embed = [chunk["text"] for chunk in valid_chunks]
         embeddings = compute_embeddings(
