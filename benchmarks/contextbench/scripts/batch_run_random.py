@@ -5,7 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from auto_run import prefetch_task_repositories
+from auto_run import prefetch_task_repositories, run_single_task
 from datasets import load_dataset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +46,7 @@ def main():
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if api_key:
-        print(f"🔑 Using API key from environment: {api_key[:20]}...")
+        print(f"🔑 Using API key from environment: {api_key[:10]}...")
     else:
         print("🔐 ANTHROPIC_API_KEY not set; using Claude CLI logged-in session.")
 
@@ -88,6 +88,8 @@ def main():
     else:
         print("⏭️ PREFETCH_REPOS=0; skipping prefetch step.")
 
+    success_count = 0
+    failure_count = 0
     for i, task in enumerate(selected_tasks):
         instance_id = task["instance_id"]
         repo_url = task["repo_url"]
@@ -96,38 +98,39 @@ def main():
         print(f"📦 [{i + 1}/{len(selected_tasks)}] Running: {instance_id}")
         print(f"   repo: {repo_url}  source: {task.get('source', '?')}")
 
-        # try:
-        # patch, elapsed, traj_data, usage = run_single_task(
-        #     instance_id=instance_id,
-        #     repo_url=repo_url,
-        #     work_root=WORK_ROOT,
-        #     mitm_script_path=str(MITM_SCRIPT),
-        #     trace_dir=TRACE_DIR,
-        #     model=MODEL,
-        #     task=task,
-        # )
+        # If want to run the task, uncomment the following code
+    #     try:
+    #         patch, elapsed, traj_data, usage = run_single_task(
+    #             instance_id=instance_id,
+    #             repo_url=repo_url,
+    #             work_root=WORK_ROOT,
+    #             mitm_script_path=str(MITM_SCRIPT),
+    #             trace_dir=TRACE_DIR,
+    #             model=MODEL,
+    #             task=task,
+    #         )
 
-        # result_entry = {
-        #     "instance_id": instance_id,
-        #     "model_patch": patch if patch else "",
-        #     "model_name_or_path": "claude-code-cli",
-        #     "elapsed_seconds": round(elapsed, 1),
-        #     "traj_data": traj_data,
-        #     "token_usage": usage,
-        # }
+    #         result_entry = {
+    #             "instance_id": instance_id,
+    #             "model_patch": patch if patch else "",
+    #             "model_name_or_path": "claude-code-cli",
+    #             "elapsed_seconds": round(elapsed, 1),
+    #             "traj_data": traj_data,
+    #             "token_usage": usage,
+    #         }
 
-        # with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
-        #     f.write(json.dumps(result_entry) + "\n")
-        # print(f"✅ Result saved for {instance_id}")
-        # success_count += 1
+    #         with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
+    #             f.write(json.dumps(result_entry) + "\n")
+    #         print(f"✅ Result saved for {instance_id}")
+    #         success_count += 1
 
-        # except Exception as e:
-        #     print(f"❌ Error processing {instance_id}: {e}")
-        #     failure_count += 1
-        # finally:
-        #     cleanup_residuals()
-        #     print("💤 Cooldown...")
-        #     time.sleep(20)
+    #     except Exception as e:
+    #         print(f"❌ Error processing {instance_id}: {e}")
+    #         failure_count += 1
+    #     finally:
+    #         cleanup_residuals()
+    #         print("💤 Cooldown...")
+    #         time.sleep(20)
 
     # print(
     #     f"\n✅ Finished {len(selected_tasks)} random tasks: "
