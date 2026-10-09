@@ -61,5 +61,5 @@ search, embeddings are recomputed on-demand via a local daemon. OpenClaw's async
 
 ## Links
 
-- [LEANN Repository](https://github.com/yichuan-w/LEANN)
+- [LEANN Repository](https://github.com/StarTrail-org/LEANN)
 - [Integration Plan](../../docs/openclaw-integration-plan.md)

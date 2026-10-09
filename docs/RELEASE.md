@@ -8,7 +8,7 @@ Add `PYPI_API_TOKEN` to GitHub Secrets:
 
 ## Release (One-click)
 
-1. Go to: https://github.com/yichuan-w/LEANN/actions/workflows/release-manual.yml
+1. Go to: https://github.com/StarTrail-org/LEANN/actions/workflows/release-manual.yml
 2. Click "Run workflow"
 3. Enter version: `0.1.2`
 4. Click green "Run workflow" button
@@ -19,4 +19,4 @@ That's it! The workflow will automatically:
 - ✅ Publish to PyPI
 - ✅ Create GitHub tag and release
 
-Check progress: https://github.com/yichuan-w/LEANN/actions
+Check progress: https://github.com/StarTrail-org/LEANN/actions

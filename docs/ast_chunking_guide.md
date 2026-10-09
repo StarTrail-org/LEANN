@@ -32,7 +32,7 @@ uv pip install -e "."
 
 #### For developers (from source, editable)
 ```bash
-git clone https://github.com/yichuan-w/LEANN.git leann
+git clone https://github.com/StarTrail-org/LEANN.git leann
 cd leann
 git submodule update --init --recursive
 uv sync

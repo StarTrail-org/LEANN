@@ -7,7 +7,7 @@ This documentation describes the automation scripts prepared for using LEANN in 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yichuan-w/LEANN.git
+git clone https://github.com/StarTrail-org/LEANN.git
 cd LEANN
 ```
 

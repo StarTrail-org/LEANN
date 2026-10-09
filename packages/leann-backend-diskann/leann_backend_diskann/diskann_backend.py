@@ -222,7 +222,7 @@ class DiskannBuilder(LeannBackendBuilderInterface):
         # When num_vectors < 256, MKL's cblas_sgemm receives degenerate matrix dimensions
         # and emits non-fatal "Parameter N was incorrect" errors to stderr on Windows.
         # The index still builds correctly, but the noise can be confusing.
-        # See: https://github.com/yichuan-w/LEANN/issues/280
+        # See: https://github.com/StarTrail-org/LEANN/issues/280
         _NUM_PQ_CENTROIDS = 256
         if data.shape[0] < _NUM_PQ_CENTROIDS:
             logger.warning(
