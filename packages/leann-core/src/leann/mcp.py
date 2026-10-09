@@ -290,8 +290,8 @@ def handle_status(request_id, args):
                 num_chunks += 1
                 try:
                     passage = json.loads(line)
-                    meta = passage.get("metadata", {})
-                    fp = meta.get("file_path") or meta.get("source", "")
+                    passage_meta = passage.get("metadata", {})
+                    fp = passage_meta.get("file_path") or passage_meta.get("source", "")
                     if fp:
                         file_paths.add(fp)
                 except json.JSONDecodeError:
