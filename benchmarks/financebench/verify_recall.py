@@ -127,11 +127,11 @@ def evaluate_recall_at_k(
         query = query_embeddings[i : i + 1]  # Keep 2D shape
 
         # Get ground truth from Flat index (standard FAISS API)
-        flat_distances, flat_indices = flat_index.search(query, k)
+        _flat_distances, flat_indices = flat_index.search(query, k)
         ground_truth_ids = {passage_ids[idx] for idx in flat_indices[0]}
 
         # Get results from HNSW index (standard FAISS API)
-        hnsw_distances, hnsw_indices = hnsw_index.search(query, k)
+        _hnsw_distances, hnsw_indices = hnsw_index.search(query, k)
         hnsw_ids = {passage_ids[idx] for idx in hnsw_indices[0]}
 
         # Calculate recall
