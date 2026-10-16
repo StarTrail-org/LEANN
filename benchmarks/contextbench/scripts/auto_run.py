@@ -39,6 +39,16 @@ TASK_METRICS_FILE = os.environ.get("TASK_METRICS_FILE", "task_metrics.jsonl").st
 PREFETCH_STRICT = os.environ.get("PREFETCH_STRICT", "1").strip() != "0"
 
 
+def _resolve_leann_mode() -> str:
+    mode = os.environ.get("LEANN_MODE", "").strip().lower()
+    if not mode:
+        return "mcp"
+    if mode in {"mcp", "none"}:
+        return mode
+    print(f"⚠️ Invalid LEANN_MODE={mode!r}; falling back to 'mcp'")
+    return "mcp"
+
+
 # Get uncommitted changes compared to the current HEAD commit.
 def get_git_diff(repo_dir: Path) -> str:
     try:
@@ -66,9 +76,12 @@ def setup_task_environment(
 
     repo = Repo(target_dir)
     repo.git.reset("--hard")
-    # Preserve LEANN indexes if present.
+    # Clear leftovers before checkout so untracked files cannot block it.
     repo.git.clean("-fdx", "-e", ".leann/")
     repo.git.checkout(task["base_commit"])
+    repo.git.reset("--hard")
+    # After checkout, ensure the base commit worktree is clean while preserving LEANN indexes.
+    repo.git.clean("-fdx", "-e", ".leann/")
     (target_dir / "PROBLEM.md").write_text(task["problem_statement"], encoding="utf-8")
     return target_dir
 
@@ -321,22 +334,18 @@ def build_strict_mcp_config_without_server(server_name: str) -> Optional[str]:
 
 # Decide whether LEANN/MCP integration is available for this task repo.
 def resolve_leann_integration(target_dir: Path) -> dict[str, str]:
-    leann_enabled = os.environ.get("LEANN_ENABLED", "1") != "0"
-    use_mcp = os.environ.get("LEANN_USE_MCP", "1") != "0"
+    requested_mode = _resolve_leann_mode()
     mcp_server_name = os.environ.get("LEANN_MCP_SERVER", "leann-server")
     leann_index_exists = (target_dir / ".leann").exists()
 
     mode = "none"
-    if leann_enabled and leann_index_exists:
-        if use_mcp:
-            mode = "mcp"
-            print(
-                f"   -> 🔍 LEANN MCP enabled (server: {mcp_server_name}, "
-                f"forced top_k={LEANN_TOP_K})"
-            )
-        else:
-            print("   -> ⚠️ LEANN_USE_MCP=0 but CLI mode is disabled; continuing without LEANN")
-    elif leann_enabled:
+    if requested_mode == "mcp" and leann_index_exists:
+        mode = "mcp"
+        print(
+            f"   -> 🔍 LEANN MCP enabled (server: {mcp_server_name}, "
+            f"forced top_k={LEANN_TOP_K})"
+        )
+    elif requested_mode == "mcp":
         print("   -> ⚠️ LEANN enabled but no .leann index found; continuing without LEANN")
 
     print(mode)
@@ -394,7 +403,7 @@ def run_claude_autonomous(
         cfg_path = resolve_claude_mcp_config(server_name)
         if not cfg_path:
             raise RuntimeError(
-                f"LEANN_USE_MCP=1 but MCP server '{server_name}' was not found in Claude config. "
+                f"LEANN_MODE=mcp but MCP server '{server_name}' was not found in Claude config. "
                 "Set CLAUDE_MCP_CONFIG_PATH or configure this server in Claude settings."
             )
         print(f"   -> ✅ Claude MCP config found for '{server_name}': {cfg_path}")

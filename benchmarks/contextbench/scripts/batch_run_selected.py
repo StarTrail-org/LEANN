@@ -18,7 +18,7 @@ PREFETCH_REPOS = os.environ.get("PREFETCH_REPOS", "1").strip() != "0"
 MITM_SCRIPT = ROOT / "mitmproxy_addons" / "trace_recorder.py"
 TRACE_DIR = ROOT / "traces" / "raw"
 
-# Instances to run. Set instance_ids here or pass via SELECTED_IDS env var (comma-separated).
+# Instances to run, set instance_ids here
 SELECTED_IDS = [
     # "SWE-Bench-Pro__python__maintenance__bugfix__19a1fba2",
     # "SWE-Bench-Pro__python__maintenance__bugfix__2464eadb",
@@ -42,37 +42,37 @@ SELECTED_IDS = [
     # "SWE-Bench-Pro__python__maintenance__bugfix__3cfd9a02",
     # "SWE-Bench-Pro__python__maintenance__bugfix__4c132bfd",
     # "SWE-Bench-Pro__python__maintenance__bugfix__7c2efe8a",
-    "SWE-Bench-Pro__go__maintenance__bugfix__40a717e5",
-    "SWE-Bench-Pro__go__maintenance__bugfix__52d866b3",
-    "SWE-Bench-Pro__go__maintenance__bugfix__720b4d92",
-    "SWE-Bench-Pro__go__maintenance__bugfix__997c7afd",
-    "SWE-Bench-Pro__javascript__maintenance__bugfix__82518720",
-    "SWE-Bench-Pro__javascript__maintenance__bugfix__e31ec45c",
-    "SWE-Bench-Pro__python__maintenance__bugfix__07bb383a",
-    "SWE-Bench-Pro__python__maintenance__bugfix__0bac5789",
-    "SWE-Bench-Pro__python__maintenance__bugfix__18d7bbbc",
-    "SWE-Bench-Pro__python__maintenance__bugfix__1cf3e889",
-    "SWE-Bench-Pro__python__maintenance__bugfix__20dad82b",
-    "SWE-Bench-Pro__python__maintenance__bugfix__20f502e0",
-    "SWE-Bench-Pro__python__maintenance__bugfix__509a20d9",
-    "SWE-Bench-Pro__python__maintenance__bugfix__53ca6a30",
-    "SWE-Bench-Pro__python__maintenance__bugfix__552343cd",
-    "SWE-Bench-Pro__python__maintenance__bugfix__5b2cf9bb",
-    "SWE-Bench-Pro__python__maintenance__bugfix__66e05eaa",
-    "SWE-Bench-Pro__python__maintenance__bugfix__6ebb54dc",
-    "SWE-Bench-Pro__python__maintenance__bugfix__87bfb374",
-    "SWE-Bench-Pro__python__maintenance__bugfix__89932d58",
-    "SWE-Bench-Pro__python__maintenance__bugfix__942d0b14",
-    "SWE-Bench-Pro__python__maintenance__bugfix__983f2896",
-    "SWE-Bench-Pro__python__maintenance__bugfix__a984b409",
-    "SWE-Bench-Pro__python__maintenance__bugfix__aa07d0c3",
-    "SWE-Bench-Pro__python__maintenance__bugfix__cf01f471",
-    "SWE-Bench-Pro__python__maintenance__bugfix__d2506f10",
-    "SWE-Bench-Pro__python__maintenance__bugfix__e579f2f0",
-    "SWE-Bench-Pro__python__maintenance__bugfix__eafb1f0b",
-    "SWE-Bench-Pro__python__maintenance__bugfix__ef8756b1",
-    "SWE-Bench-Pro__python__maintenance__bugfix__f87209f8",
-    "SWE-Bench-Pro__python__maintenance__bugfix__ff79bafd",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__40a717e5",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__52d866b3",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__720b4d92",
+    # "SWE-Bench-Pro__go__maintenance__bugfix__997c7afd",
+    # "SWE-Bench-Pro__javascript__maintenance__bugfix__82518720",
+    # "SWE-Bench-Pro__javascript__maintenance__bugfix__e31ec45c",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__07bb383a",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__0bac5789",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__18d7bbbc",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__1cf3e889",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__20dad82b",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__20f502e0",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__509a20d9",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__53ca6a30",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__552343cd",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__5b2cf9bb",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__66e05eaa",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__6ebb54dc",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__87bfb374",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__89932d58",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__942d0b14",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__983f2896",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__a984b409",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__aa07d0c3",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__cf01f471",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__d2506f10",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__e579f2f0",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__eafb1f0b",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__ef8756b1",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__f87209f8",
+    # "SWE-Bench-Pro__python__maintenance__bugfix__ff79bafd",
 ]
 
 if os.environ.get("SELECTED_IDS"):
@@ -105,7 +105,7 @@ def main():
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if api_key:
-        print(f"🔑 Using API key from environment: {api_key[:20]}...")
+        print(f"🔑 Using API key from environment: {api_key[:10]}...")
     else:
         print("🔐 ANTHROPIC_API_KEY not set; using Claude CLI logged-in session.")
 
