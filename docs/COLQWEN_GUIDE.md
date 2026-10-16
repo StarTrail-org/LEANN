@@ -135,7 +135,7 @@ Auto-detection: CUDA > MPS > CPU
 - **Pylate**: https://github.com/lightonai/pylate
 - **ColBERT**: https://github.com/stanford-futuredata/ColBERT
 - **ColPali Paper**: Vision-Language Models for Document Retrieval
-- **Issue #119**: https://github.com/yichuan-w/LEANN/issues/119
+- **Issue #119**: https://github.com/StarTrail-org/LEANN/issues/119
 
 ## 🐛 Troubleshooting
 

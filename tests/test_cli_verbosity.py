@@ -2,7 +2,7 @@
 
 This module tests the configurable verbosity functionality that allows
 suppressing C++ output from FAISS/HNSW.
-See: https://github.com/yichuan-w/LEANN/issues/187
+See: https://github.com/StarTrail-org/LEANN/issues/187
 """
 
 import os

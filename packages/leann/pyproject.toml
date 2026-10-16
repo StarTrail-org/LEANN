@@ -38,5 +38,5 @@ cpu = [
 ]
 
 [project.urls]
-Repository = "https://github.com/yichuan-w/LEANN"
-Issues = "https://github.com/yichuan-w/LEANN/issues"
+Repository = "https://github.com/StarTrail-org/LEANN"
+Issues = "https://github.com/StarTrail-org/LEANN/issues"

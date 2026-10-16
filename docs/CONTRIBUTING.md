@@ -21,7 +21,7 @@ We welcome contributions! Leann is built by the community, for the community.
 
 2. **Clone the repository**:
    ```bash
-   git clone https://github.com/yichuan-w/LEANN.git leann
+   git clone https://github.com/StarTrail-org/LEANN.git leann
    git submodule update --init --recursive
    cd leann
    ```

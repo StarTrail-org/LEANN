@@ -9,7 +9,7 @@ Bu dokümantasyon, LEANN'ı günlük yaşamda kullanmak için hazırlanmış oto
 Bu scriptleri kullanmak için önce LEANN repository'sini klonlayın:
 
 ```bash
-git clone https://github.com/yichuan-w/LEANN.git
+git clone https://github.com/StarTrail-org/LEANN.git
 cd LEANN
 ```
 
