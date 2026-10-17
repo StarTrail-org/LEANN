@@ -25,7 +25,7 @@ from .chat import get_llm
 from .embedding_server_manager import EmbeddingServerManager
 from .interface import LeannBackendFactoryInterface
 from .metadata_filter import MetadataFilterEngine
-from .registry import BACKEND_REGISTRY
+from .registry import BACKEND_REGISTRY, autodiscover_backends
 
 logger = logging.getLogger(__name__)
 
@@ -1869,3 +1869,9 @@ class LeannChat:
             self.cleanup()
         except Exception:
             pass
+
+
+# Register installed ``leann-backend-*`` packages. This used to live in
+# ``leann/__init__.py``; it runs here so that anything importing ``leann.api``
+# (directly or through the lazy package attributes) still sees every backend.
+autodiscover_backends()
