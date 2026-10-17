@@ -1,5 +1,7 @@
+import hashlib
 import json
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -9,20 +11,65 @@ from .embedding_server_manager import EmbeddingServerManager
 from .interface import LeannBackendSearcherInterface
 
 
+class QueryEmbeddingCache:
+    """LRU cache for query embeddings to avoid recomputation."""
+
+    def __init__(self, max_size: int = 1000, embedding_model: Optional[str] = None):
+        self.cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        self.max_size = max_size
+        self.embedding_model = embedding_model or ""
+
+    def _hash_query(self, query: str, query_template: Optional[str] = None) -> str:
+        """Create hash key for query."""
+        key_data = {
+            "query": query,
+            "template": query_template or "",
+            "model": self.embedding_model,
+        }
+        key_str = json.dumps(key_data, sort_keys=True)
+        return hashlib.sha256(key_str.encode()).hexdigest()
+
+    def get(self, query: str, query_template: Optional[str] = None) -> Optional[np.ndarray]:
+        """Get cached embedding if exists.
+
+        Returns a copy of the stored vector with shape (D,).
+        Callers that need batch shape should reshape.
+        """
+        key = self._hash_query(query, query_template)
+        cached = self.cache.get(key)
+        if cached is None:
+            return None
+        # Mark as most-recently-used; without this, eviction below is FIFO and
+        # a hot query can be dropped while a never-reused one survives.
+        self.cache.move_to_end(key)
+        return cached.copy()
+
+    def put(self, query: str, embedding: np.ndarray, query_template: Optional[str] = None):
+        """Cache embedding (stores a 1-D vector of shape (D,))."""
+        key = self._hash_query(query, query_template)
+
+        # Normalize to 1-D so cache hits always return a consistent shape
+        vec = np.asarray(embedding, dtype=np.float32).reshape(-1)
+
+        # max_size <= 0 disables the cache; storing nothing keeps `get` a miss
+        # and avoids evicting from an empty mapping.
+        if self.max_size <= 0:
+            return
+
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        elif len(self.cache) >= self.max_size:
+            self.cache.popitem(last=False)  # evict least-recently-used
+
+        self.cache[key] = vec.copy()
+
+    def clear(self):
+        """Clear cache."""
+        self.cache.clear()
+
+
 class ReusableZMQConnection:
-    """Persistent ZMQ REQ connection to the embedding server.
-
-    The socket is created once and reused across searches instead of being
-    rebuilt per query. It lives on the searcher for the searcher's lifetime,
-    and `LeannChat` and the LlamaIndex retrievers hold a searcher for as long
-    as they live.
-
-    **A `zmq.Socket` is not thread-safe.** A searcher sharing this connection
-    must not have `search` called concurrently from multiple threads; give
-    each thread its own searcher. The previous per-query socket did not carry
-    this constraint.
-
-    """
+    """Reusable ZMQ connection to avoid creating new context/socket per request."""
 
     def __init__(self):
         self.context = None
@@ -136,6 +183,10 @@ class BaseSearcher(LeannBackendSearcherInterface, ABC):
         )
 
         # Optimization: Query embedding cache
+        cache_size = kwargs.get("query_cache_size", 1000)
+        self.query_cache = QueryEmbeddingCache(
+            max_size=cache_size, embedding_model=self.embedding_model
+        )
 
         # Optimization: Reusable ZMQ connection
         self.zmq_connection = ReusableZMQConnection()
@@ -215,6 +266,15 @@ class BaseSearcher(LeannBackendSearcherInterface, ABC):
         Returns:
             Query embedding as numpy array with shape (1, D)
         """
+        # Store original query for caching (before template is applied)
+        original_query = query
+
+        # Check cache first (before applying template). Cache stores (D,);
+        # always return (1, D) to match uncached paths.
+        cached = self.query_cache.get(original_query, query_template)
+        if cached is not None:
+            return np.asarray(cached, dtype=np.float32).reshape(1, -1)
+
         # Apply query template BEFORE any computation path
         # This ensures template is applied consistently for both server and fallback paths
         if query_template:
@@ -238,6 +298,9 @@ class BaseSearcher(LeannBackendSearcherInterface, ABC):
                     0:1
                 ]  # Return (1, D) shape
 
+                # Cache the result (use original query before template)
+                self.query_cache.put(original_query, embedding[0], query_template)
+
                 return embedding
             except Exception as e:
                 print(f"⚠️ Embedding server failed: {e}")
@@ -253,6 +316,9 @@ class BaseSearcher(LeannBackendSearcherInterface, ABC):
             embedding_mode,
             provider_options=self.embedding_options,
         )
+
+        # Cache the result (use original query before template)
+        self.query_cache.put(original_query, embedding[0], query_template)
 
         return embedding
 
