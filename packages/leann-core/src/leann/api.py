@@ -23,6 +23,7 @@ from leann.interface import LeannBackendSearcherInterface
 
 from .chat import get_llm
 from .embedding_server_manager import EmbeddingServerManager
+from .index_offsets import load_offset_map
 from .interface import LeannBackendFactoryInterface
 from .metadata_filter import MetadataFilterEngine
 from .registry import BACKEND_REGISTRY, autodiscover_backends
@@ -238,11 +239,10 @@ class PassageManager:
             if not Path(index_file).exists():
                 raise FileNotFoundError(f"Passage index file not found: {index_file}")
 
-            with open(index_file, "rb") as f:
-                offset_map: dict[str, int] = pickle.load(f)
-                self.offset_maps[passage_file] = offset_map
-                self.passage_files[passage_file] = passage_file
-                self._total_count += len(offset_map)
+            offset_map = load_offset_map(index_file)
+            self.offset_maps[passage_file] = offset_map
+            self.passage_files[passage_file] = passage_file
+            self._total_count += len(offset_map)
 
     def get_passage(self, passage_id: str) -> dict[str, Any]:
         # Fast path: check each shard map (there are typically few shards).
@@ -920,8 +920,7 @@ class LeannBuilder:
                 f"Index was built with backend '{backend_name}', cannot update with '{self.backend_name}'."
             )
 
-        with open(offset_file, "rb") as f:
-            offset_map: dict[str, int] = pickle.load(f)
+        offset_map = load_offset_map(offset_file)
         existing_ids = set(offset_map.keys())
 
         # IVF: optional delete (for reindex / file-change: remove then re-insert)
