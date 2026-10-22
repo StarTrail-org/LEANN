@@ -1,10 +1,12 @@
 import json
 import pickle
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
-from leann import LeannSearcher
+from leann import BACKEND_REGISTRY, LeannBuilder, LeannSearcher
 from leann.index_offsets import load_offset_map
+from leann.sync import FileSynchronizer
 
 
 class _MarkerPayload:
@@ -70,5 +72,31 @@ def test_searcher_rejects_malicious_offset_map_before_loading_backend(tmp_path: 
 
     with pytest.raises(pickle.UnpicklingError, match="not allowed"):
         LeannSearcher(str(index_path), enable_warmup=False, use_daemon=False)
+
+    assert not marker.exists()
+
+
+def test_sync_snapshot_rejects_pickled_callable(tmp_path: Path) -> None:
+    marker = tmp_path / "executed"
+    snapshot = tmp_path / "crafted.sync_context.pickle"
+    with snapshot.open("wb") as handle:
+        pickle.dump(_MarkerPayload(marker), handle)
+
+    synchronizer = FileSynchronizer(root_dir=str(tmp_path), snapshot_path=str(snapshot))
+
+    assert synchronizer.tree is None
+    assert not marker.exists()
+
+
+def test_build_from_embeddings_rejects_pickled_callable(tmp_path: Path, monkeypatch) -> None:
+    marker = tmp_path / "executed"
+    embeddings = tmp_path / "crafted-embeddings.pkl"
+    with embeddings.open("wb") as handle:
+        pickle.dump(_MarkerPayload(marker), handle)
+    monkeypatch.setitem(BACKEND_REGISTRY, "security-test", Mock())
+    builder = LeannBuilder(backend_name="security-test", dimensions=2)
+
+    with pytest.raises(pickle.UnpicklingError, match="not allowed"):
+        builder.build_index_from_embeddings(str(tmp_path / "index.leann"), str(embeddings))
 
     assert not marker.exists()

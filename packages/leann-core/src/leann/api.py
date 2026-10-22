@@ -30,6 +30,47 @@ from .registry import BACKEND_REGISTRY, autodiscover_backends
 
 logger = logging.getLogger(__name__)
 
+_EMBEDDINGS_PICKLE_GLOBALS = {
+    ("numpy", "dtype"),
+    ("numpy", "ndarray"),
+    ("numpy.core.multiarray", "_reconstruct"),
+    ("numpy.core.multiarray", "scalar"),
+    ("numpy.core.numeric", "_frombuffer"),
+    ("numpy._core.multiarray", "_reconstruct"),
+    ("numpy._core.multiarray", "scalar"),
+    ("numpy._core.numeric", "_frombuffer"),
+}
+
+
+class _EmbeddingsUnpickler(pickle.Unpickler):
+    def find_class(self, module: str, name: str):
+        if (module, name) in _EMBEDDINGS_PICKLE_GLOBALS:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(
+            f"Global object {module}.{name} is not allowed in an embeddings file"
+        )
+
+    def persistent_load(self, pid):
+        raise pickle.UnpicklingError("Persistent references are not allowed in an embeddings file")
+
+
+def _load_embeddings_pickle(path: str) -> tuple[Any, np.ndarray]:
+    with open(path, "rb") as handle:
+        data = _EmbeddingsUnpickler(handle).load()
+
+    if not isinstance(data, tuple) or len(data) != 2:
+        raise ValueError(
+            f"Invalid embeddings file format. Expected tuple with 2 elements, got {type(data)}"
+        )
+
+    ids, embeddings = data
+    if not isinstance(embeddings, np.ndarray):
+        raise ValueError(f"Expected embeddings to be numpy array, got {type(embeddings)}")
+    if embeddings.dtype.kind in {"O", "V"}:
+        raise ValueError("Embeddings must use a numeric dtype")
+    return ids, embeddings
+
+
 # Passage ID schemes recorded in <index>.meta.json["passage_id_scheme"].
 # - "sequential": today's default; IDs are str(insertion_index) (api.py:add_text).
 # - "content-hash": planned in #329; IDs are sha256(text)[:16], stable across
@@ -849,20 +890,7 @@ class LeannBuilder:
             index_path: Path where the index will be saved
             embeddings_file: Path to pickle file containing (ids, embeddings) tuple
         """
-        # Load pre-computed embeddings
-        with open(embeddings_file, "rb") as f:
-            data = pickle.load(f)
-
-        if not isinstance(data, tuple) or len(data) != 2:
-            raise ValueError(
-                f"Invalid embeddings file format. Expected tuple with 2 elements, got {type(data)}"
-            )
-
-        ids, embeddings = data
-
-        if not isinstance(embeddings, np.ndarray):
-            raise ValueError(f"Expected embeddings to be numpy array, got {type(embeddings)}")
-
+        ids, embeddings = _load_embeddings_pickle(embeddings_file)
         self.build_index_from_arrays(index_path, ids, embeddings)
 
     @staticmethod

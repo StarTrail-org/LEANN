@@ -94,6 +94,8 @@ fixes). Newest entries at the bottom.
 - Restricted passage offset-map unpickling to the primitive dictionary shape LEANN writes.
 - Rejected crafted `.passages.idx` files before a searcher or incremental update can continue.
 - Added regression coverage for the searcher entry point, primitive compatibility, and malformed input.
+- Restricted sync snapshots and embeddings pickles to their expected object graphs.
+- Loaded FlashLib IVF state dictionaries with PyTorch's safe weights-only loader.
 
 ## 2026-10-23: Refuse to load a custom encoder as a vanilla BertModel
 
