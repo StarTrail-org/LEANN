@@ -78,6 +78,9 @@ metadata_filters = {
 {"word_count": {"<": 500}}      # Short passages
 ```
 
+Numeric values stored as strings are ordered numerically (for example,
+`"10" > "2"`). Other strings, including ISO dates, retain lexical ordering.
+
 #### Membership Operators
 - `"in"`: Value is in list
 - `"not_in"`: Value is not in list
