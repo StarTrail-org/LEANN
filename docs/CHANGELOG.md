@@ -88,3 +88,10 @@ fixes). Newest entries at the bottom.
 - `get_model_token_limit()` reads `max_seq_length` from Hugging Face sentence-transformers repos instead of assuming 2048 tokens for them.
 - `create_text_chunks(max_tokens_per_chunk=...)` now only shrinks `chunk_size`; it previously replaced it, growing 256-token chunks to ~1700 for unknown models.
 - Existing indexes are unchanged; rebuild with `--force` to re-chunk with the new sizes.
+
+## 2026-10-24: Complete backend releases and lock down ZMQ defaults
+
+- Build and publish `leann-backend-flashlib` and `leann-backend-flashlib-ivf` in the release workflow so they share the current package version instead of remaining absent from PyPI.
+- Keep every internal package dependency and the reference Docker version aligned during a release bump.
+- Verify all seven published packages at the target version on PyPI before creating the GitHub tag and release.
+- Centralize the ZMQ embedding-server bind endpoint and cover its loopback default and explicit override with regression tests.

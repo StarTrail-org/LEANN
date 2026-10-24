@@ -86,9 +86,10 @@ jobs:
             COMMIT_SHA=$(git rev-parse HEAD)
           else
             ./scripts/bump_version.sh ${{ inputs.version }}
+            uv lock
             git config user.name "GitHub Actions"
             git config user.email "actions@github.com"
-            git add packages/*/pyproject.toml
+            git add packages/*/pyproject.toml uv.lock docker/Dockerfile docker/Dockerfile.cpu docker/README.md
             git commit -m "chore: release v${{ inputs.version }}"
             git push origin main
             COMMIT_SHA=$(git rev-parse HEAD)
@@ -145,6 +146,52 @@ jobs:
           twine upload dist/* --skip-existing --verbose
 
           echo "✅ Published to PyPI!"
+
+      - name: Verify every package reached PyPI
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          version = os.environ["RELEASE_VERSION"]
+          packages = [
+              "leann",
+              "leann-core",
+              "leann-backend-hnsw",
+              "leann-backend-diskann",
+              "leann-backend-ivf",
+              "leann-backend-flashlib",
+              "leann-backend-flashlib-ivf",
+          ]
+          deadline = time.time() + 180
+          missing = {}
+
+          for package in packages:
+              while True:
+                  try:
+                      url = f"https://pypi.org/pypi/{package}/json"
+                      with urllib.request.urlopen(url, timeout=20) as response:
+                          data = json.load(response)
+                      files = data.get("releases", {}).get(version, [])
+                      if files:
+                          print(f"OK {package} {version}: {len(files)} files")
+                          break
+                      missing[package] = "version has no files"
+                  except urllib.error.HTTPError as exc:
+                      missing[package] = f"HTTP {exc.code}"
+
+                  if time.time() >= deadline:
+                      raise SystemExit(
+                          f"PyPI verification failed for {package} {version}: {missing[package]}"
+                      )
+                  time.sleep(10)
+
+          PY
 
       - name: Create release
         run: |

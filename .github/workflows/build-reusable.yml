@@ -412,6 +412,16 @@ jobs:
           retry 3 uv build --wheel --python ${{ matrix.python }} --find-links ${GITHUB_WORKSPACE}/packages/leann-core/dist
           cd ../..
 
+          # Build GPU backends as thin Python wheels. Their CUDA runtime is supplied by
+          # the installed FlashLib dependency; compilation happens when those backends run.
+          cd packages/leann-backend-flashlib
+          retry 3 uv build --wheel --python ${{ matrix.python }}
+          cd ../..
+
+          cd packages/leann-backend-flashlib-ivf
+          retry 3 uv build --wheel --python ${{ matrix.python }}
+          cd ../..
+
           # Build meta package (platform independent)
           cd packages/leann
           retry 3 uv build

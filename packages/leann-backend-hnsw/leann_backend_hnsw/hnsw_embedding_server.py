@@ -15,6 +15,7 @@ from typing import Any, Optional
 import msgpack
 import numpy as np
 import zmq
+from leann.embedding_server_endpoint import bind_zmq_embedding_socket
 
 # Set up logging based on environment variable
 LOG_LEVEL = os.getenv("LEANN_LOG_LEVEL", "WARNING").upper()
@@ -168,11 +169,8 @@ def create_hnsw_embedding_server(
 
         context = zmq.Context()
         rep_socket = context.socket(zmq.REP)
-        zmq_host = os.getenv("LEANN_EMBEDDING_SERVER_HOST", "127.0.0.1")
-        if ":" in zmq_host and not zmq_host.startswith("["):
-            zmq_host = f"[{zmq_host}]"  # literal IPv6 needs brackets in ZMQ endpoints
-        rep_socket.bind(f"tcp://{zmq_host}:{zmq_port}")
-        logger.info(f"HNSW ZMQ REP server listening on {zmq_host}:{zmq_port}")
+        endpoint = bind_zmq_embedding_socket(rep_socket, zmq_port)
+        logger.info(f"HNSW ZMQ REP server listening on {endpoint}")
         rep_socket.setsockopt(zmq.RCVTIMEO, 1000)
         rep_socket.setsockopt(zmq.SNDTIMEO, 1000)
         rep_socket.setsockopt(zmq.LINGER, 0)
