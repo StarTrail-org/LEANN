@@ -531,6 +531,46 @@ def compute_embeddings(
         raise ValueError(f"Unsupported embedding mode: {mode}")
 
 
+def _resolve_trust_remote_code() -> bool:
+    """Whether to execute model-repository code when loading an embedding model.
+
+    Off by default: trust_remote_code runs arbitrary Python from the model repo.
+    Set LEANN_TRUST_REMOTE_CODE=1 for a model that needs it;
+    _assert_remote_code_available names the variable when it hits one.
+    """
+    return os.getenv("LEANN_TRUST_REMOTE_CODE", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _assert_remote_code_available(model_name: str, trust_remote_code: bool) -> None:
+    """Refuse to load a model whose real architecture would be silently discarded.
+
+    jinaai/jina-embeddings-v2-base-code and other custom encoders declare their
+    architecture through config.auto_map while keeping model_type="bert". Loaded
+    without trust_remote_code, transformers builds a vanilla BertModel instead,
+    drops every weight it cannot map, randomly initialises the rest, and returns
+    one constant vector for every input. Nothing raises: the index builds, search
+    returns results, and the ranking is noise. Raise here instead.
+    """
+    if trust_remote_code:
+        return
+    try:
+        from transformers import AutoConfig
+
+        auto_map = getattr(AutoConfig.from_pretrained(model_name), "auto_map", None)
+    except Exception as exc:
+        # Offline, a private repo, or not a transformers model: nothing to assert.
+        logger.debug(f"Could not read the config for {model_name}: {exc}")
+        return
+    if auto_map:
+        raise ValueError(
+            f"{model_name} ships its own modeling code (config.auto_map: "
+            f"{sorted(auto_map)}). Loading it without trust_remote_code produces a "
+            "randomly initialised model that returns an identical embedding for every "
+            "input, so the index would rank by noise. Set LEANN_TRUST_REMOTE_CODE=1 to "
+            "run the model repository's code, or pick a model that does not need it."
+        )
+
+
 def compute_embeddings_sentence_transformers(
     texts: list[str],
     model_name: str,
@@ -588,8 +628,13 @@ def compute_embeddings_sentence_transformers(
     if adaptive_optimization:
         batch_size = _resolve_adaptive_batch_size(device, model_name)
 
+    trust_remote_code = _resolve_trust_remote_code()
+    _assert_remote_code_available(model_name, trust_remote_code)
+
     # Create cache key
-    cache_key = f"sentence_transformers_{model_name}_{device}_{use_fp16}_optimized"
+    cache_key = (
+        f"sentence_transformers_{model_name}_{device}_{use_fp16}_{trust_remote_code}_optimized"
+    )
 
     pre_model_init_end_time = time.time()
     logger.debug(
@@ -653,6 +698,7 @@ def compute_embeddings_sentence_transformers(
             model = SentenceTransformer(
                 model_name,
                 device=device,
+                trust_remote_code=trust_remote_code,
                 model_kwargs=local_model_kwargs,
                 tokenizer_kwargs=local_tokenizer_kwargs,
                 local_files_only=True,
@@ -668,6 +714,7 @@ def compute_embeddings_sentence_transformers(
                     model = SentenceTransformer(
                         model_name,
                         device=device,
+                        trust_remote_code=trust_remote_code,
                         local_files_only=True,
                     )
                     logger.info("Model loaded successfully! (local + basic)")
@@ -676,6 +723,7 @@ def compute_embeddings_sentence_transformers(
                     model = SentenceTransformer(
                         model_name,
                         device=device,
+                        trust_remote_code=trust_remote_code,
                         local_files_only=False,
                     )
                     logger.info("Model loaded successfully! (network + basic)")
@@ -693,6 +741,7 @@ def compute_embeddings_sentence_transformers(
                 model = SentenceTransformer(
                     model_name,
                     device=device,
+                    trust_remote_code=trust_remote_code,
                     model_kwargs=network_model_kwargs,
                     tokenizer_kwargs=network_tokenizer_kwargs,
                     local_files_only=False,
@@ -706,6 +755,7 @@ def compute_embeddings_sentence_transformers(
                     model = SentenceTransformer(
                         model_name,
                         device=device,
+                        trust_remote_code=trust_remote_code,
                         local_files_only=False,
                     )
                     logger.info("Model loaded successfully! (network + basic)")

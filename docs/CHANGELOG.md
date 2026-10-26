@@ -89,9 +89,30 @@ fixes). Newest entries at the bottom.
 - `create_text_chunks(max_tokens_per_chunk=...)` now only shrinks `chunk_size`; it previously replaced it, growing 256-token chunks to ~1700 for unknown models.
 - Existing indexes are unchanged; rebuild with `--force` to re-chunk with the new sizes.
 
-## 2026-10-24: Complete backend releases and lock down ZMQ defaults
+## 2026-10-23: Refuse to load a custom encoder as a vanilla BertModel
 
-- Build and publish `leann-backend-flashlib` and `leann-backend-flashlib-ivf` in the release workflow so they share the current package version instead of remaining absent from PyPI.
-- Keep every internal package dependency and the reference Docker version aligned during a release bump.
-- Verify all seven published packages at the target version on PyPI before creating the GitHub tag and release.
-- Centralize the ZMQ embedding-server bind endpoint and cover its loopback default and explicit override with regression tests.
+- `jinaai/jina-embeddings-v2-base-code` (and any encoder that declares its
+  architecture through `config.auto_map` while keeping `model_type="bert"`) was
+  being loaded without `trust_remote_code`. Transformers silently built a plain
+  `BertModel` instead, discarded every weight it could not map, randomly
+  initialised ~70 tensors (all 12 layers' feed-forward and output LayerNorm
+  weights, plus position embeddings), and returned one constant vector for every
+  input. Nothing raised: the index built, search returned results, and the
+  ranking was noise. Measured on an 8-chunk retrieval probe, pairwise chunk
+  cosine similarity was 1.0000 (mean and max) and recall@1 was 0.000; with the
+  model's own code loaded, cosine fell to 0.064 mean / 0.239 max and recall@1
+  reached 1.000.
+- `embedding_compute.py` now checks `config.auto_map` before loading and raises
+  with the model name and the fix, rather than producing a degenerate index.
+  Opt in with `LEANN_TRUST_REMOTE_CODE=1`; it stays off by default because
+  `trust_remote_code` executes arbitrary Python from the model repository, which
+  matches the existing default in `chat.py`.
+- The flag is now threaded through all five `SentenceTransformer(...)` call
+  sites in the loader cascade and included in the model cache key.
+- `benchmarks/contextbench/scripts/batch_run_random.py` executes tasks again.
+  The block had been commented out, and the commented code unpacked four values
+  from `run_single_task`, which has since returned five
+  (`patch, latency_seconds, agent_seconds, traj_data, usage`) — so uncommenting
+  it would have failed on the unpack. The restored block matches
+  `batch_run_selected.py`, which was already on the current contract, and
+  records `agent_seconds` and `latency_seconds` in each result row.

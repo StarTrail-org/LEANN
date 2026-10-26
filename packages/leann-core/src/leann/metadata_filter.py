@@ -7,6 +7,7 @@ operators for different data types including numbers, strings, booleans, and lis
 """
 
 import logging
+from decimal import Decimal, InvalidOperation
 from typing import Any, Optional, Union
 
 logger = logging.getLogger(__name__)
@@ -223,7 +224,15 @@ class MetadataFilterEngine:
         try:
             # Try to convert both values to numbers for comparison
             if isinstance(field_value, str) and isinstance(expected_value, str):
-                # String comparison if both are strings
+                # Numeric metadata can also be stored as strings. Keep lexical
+                # ordering for dates and other strings that are not numbers.
+                try:
+                    field_decimal = Decimal(field_value)
+                    expected_decimal = Decimal(expected_value)
+                    if field_decimal.is_finite() and expected_decimal.is_finite():
+                        return compare_func(field_decimal, expected_decimal)
+                except InvalidOperation:
+                    pass
                 return compare_func(field_value, expected_value)
 
             # Numeric comparison - attempt to convert to float
