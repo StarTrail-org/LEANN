@@ -42,9 +42,10 @@ def test_leann_base_dependencies_include_diskann():
     data = _load_leann_pyproject()
     deps = data["project"].get("dependencies", [])
 
-    assert "leann-core>=0.1.0" in deps
-    assert "leann-backend-hnsw>=0.1.0" in deps
-    assert "leann-backend-diskann>=0.1.0" in deps
+    # The release bumps these lower bounds, so check the package and that a bound exists.
+    assert any(dep.startswith("leann-core>=") for dep in deps)
+    assert any(dep.startswith("leann-backend-hnsw>=") for dep in deps)
+    assert any(dep.startswith("leann-backend-diskann>=") for dep in deps)
 
 
 def test_leann_core_numpy_is_bounded_below_3():
@@ -74,7 +75,7 @@ def test_leann_cpu_extra_defined():
     extras = data["project"].get("optional-dependencies", {})
 
     assert "cpu" in extras
-    assert "leann-core[cpu]>=0.1.0" in extras["cpu"]
+    assert any(dep.startswith("leann-core[cpu]>=") for dep in extras["cpu"])
 
 
 def test_leann_core_does_not_import_a_backend_at_module_scope():
