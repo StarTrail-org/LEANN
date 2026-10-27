@@ -1158,8 +1158,9 @@ leann build INDEX_NAME --docs DIRECTORY|FILE [DIRECTORY|FILE ...] [OPTIONS]
 Options:
   --backend {hnsw,diskann}     Backend to use (default: hnsw)
   --embedding-model MODEL      Embedding model (default: facebook/contriever)
-  --graph-degree N             Graph degree (default: 32)
-  --complexity N               Build complexity (default: 64)
+  --graph-degree N             Graph degree (default: backend's own; HNSW M=32, DiskANN 32)
+  --complexity N               Build complexity (default: backend's own; HNSW efConstruction=200, DiskANN 64)
+  --num-threads N              Build threads (default: backend's own; HNSW all cores on Linux, DiskANN 8)
   --force                      Force rebuild existing index
   --compact / --no-compact     Use compact storage (default: true). Must be `no-compact` for `no-recompute` build.
   --recompute / --no-recompute Enable recomputation (default: true)
