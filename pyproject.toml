@@ -51,7 +51,7 @@ dependencies = [
     "gitignore-parser>=0.1.12",
     # AST-aware code chunking dependencies
     "astchunk>=0.1.0",
-    "tree-sitter>=0.20.0",
+    "tree-sitter>=0.20.0,!=0.26.0",
     "tree-sitter-python>=0.20.0",
     "tree-sitter-java>=0.20.0",
     "tree-sitter-c-sharp>=0.20.0",
