@@ -118,7 +118,7 @@ uv pip install leann
 # CPU-only (Linux): use the `cpu` extra (e.g. `leann[cpu]`)
 ```
 
-> **Linux note:** if a later `leann build` fails with `Security Violation [pathsec.open]: refusing multiply-linked file`, reinstall with `UV_LINK_MODE=copy uv pip install --reinstall ...` (or `UV_LINK_MODE=copy uv tool install --reinstall ...`) - uv's default hardlink installs trip nltk's hardened file loader bundled with llama-index. Details in the [FAQ](docs/faq.md).
+> **Linux note:** if a later `leann build` fails with `Security Violation [pathsec.open]: refusing multiply-linked file`, reinstall with `UV_LINK_MODE=copy uv pip install --reinstall ...` (or `UV_LINK_MODE=copy uv tool install --reinstall ...`) - uv's default hardlink installs trip nltk's hardened file loader bundled with llama-index. If it instead fails with `Resource 'stopwords' not found` after `NLTK will not read data from ...` warnings, the environment is group-writable: `export NLTK_DATA=` a private directory (`mkdir -m 700`). Details in the [FAQ](docs/faq.md).
 
 <!--
 > Low-resource? See "Low-resource setups" in the [Configuration Guide](docs/configuration-guide.md#low-resource-setups). -->
