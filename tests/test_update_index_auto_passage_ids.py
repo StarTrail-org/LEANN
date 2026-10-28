@@ -18,7 +18,6 @@ non-compact HNSW path, where that decision is reached through the same code.
 import hashlib
 import json
 import pickle
-import platform
 import sys
 from unittest.mock import patch
 
@@ -154,10 +153,10 @@ def test_a_content_hash_id_is_still_the_id_of_that_content(tmp_path, monkeypatch
 
 
 @pytest.mark.skipif(
-    sys.platform == "darwin" and platform.machine() == "x86_64",
-    reason="On Intel macOS runners the native ``index.add()`` call that ``update_index()`` makes "
-    "at ``api.py:1194`` aborts inside the FAISS bindings, taking the whole pytest session with "
-    "it; the passage-ID decision under test happens before that call.",
+    sys.platform == "darwin",
+    reason="On macOS runners the native ``index.add()`` call that ``update_index()`` makes at "
+    "``api.py:1194`` aborts inside the FAISS bindings, taking the whole pytest session with it; "
+    "the passage-ID decision under test happens before that call.",
 )
 def test_a_non_compact_hnsw_index_appends_without_ids_too(tmp_path):
     """The rejection happens in ``update_index`` before any backend runs, so HNSW hits it as well."""
