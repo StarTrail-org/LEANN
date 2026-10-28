@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 from .api import Fts5BM25Index, LeannBuilder, LeannChat, LeannSearcher
 from .embedding_server_manager import EmbeddingServerManager
+from .index_offsets import load_offset_map
 from .interactive_utils import create_cli_session
 from .registry import DEFAULT_INDEX_SCAN_DEPTH, iter_index_meta_files, register_project_directory
 from .settings import (
@@ -2241,8 +2242,7 @@ Examples:
         offset_file = index_dir / "documents.leann.passages.idx"
         live_ids: set[str] | None = None
         if offset_file.exists():
-            with open(offset_file, "rb") as f:
-                live_ids = set(pickle.load(f).keys())
+            live_ids = set(load_offset_map(offset_file))
         chunk_ids_by_file = self._load_chunk_ids_by_file(passages_file, live_ids=live_ids)
         roots = self._load_sync_roots(index_dir)
         ids_to_remove: list[str] = []
@@ -2288,8 +2288,7 @@ Examples:
         offset_file = index_dir / "documents.leann.passages.idx"
         live_ids: set[str] | None = None
         if offset_file.exists():
-            with open(offset_file, "rb") as f:
-                live_ids = set(pickle.load(f).keys())
+            live_ids = set(load_offset_map(offset_file))
         chunk_ids_by_file = (
             self._load_chunk_ids_by_file(passages_file, live_ids=live_ids)
             if passages_file.exists()
