@@ -1304,7 +1304,7 @@ def get_llm(llm_config: Optional[dict[str, Any]] = None) -> LLMInterface:
         return GeminiChat(model=model or "gemini-2.5-flash", api_key=llm_config.get("api_key"))
     elif llm_type == "anthropic":
         return AnthropicChat(
-            model=model or "claude-3-5-sonnet-20241022",
+            model=model or "claude-haiku-4-5",
             api_key=llm_config.get("api_key"),
             base_url=llm_config.get("base_url"),
         )
