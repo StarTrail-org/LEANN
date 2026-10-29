@@ -38,8 +38,9 @@ class TestAnthropicDefaultModel:
 
     @patch("anthropic.Anthropic")
     def test_factory_keeps_an_explicit_model(self, mock_anthropic_cls):
-        from leann.chat import get_llm
+        from leann.chat import AnthropicChat, get_llm
 
         llm = get_llm({"type": "anthropic", "model": "claude-sonnet-5-5", "api_key": "test-key"})
 
+        assert isinstance(llm, AnthropicChat)
         assert llm.model == "claude-sonnet-5-5"
