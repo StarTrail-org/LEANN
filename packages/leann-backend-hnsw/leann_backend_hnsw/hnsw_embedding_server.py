@@ -17,6 +17,8 @@ import numpy as np
 import zmq
 from leann.embedding_server_endpoint import bind_zmq_embedding_socket
 
+from .hnsw_backend import normalize_l2
+
 # Set up logging based on environment variable
 LOG_LEVEL = os.getenv("LEANN_LOG_LEVEL", "WARNING").upper()
 logger = logging.getLogger(__name__)
@@ -159,6 +161,19 @@ def create_hnsw_embedding_server(
             pass
         return str(nid)
 
+    def _compute_passage_embeddings(texts: list[str]) -> np.ndarray:
+        embeddings = compute_embeddings(
+            texts,
+            model_name,
+            mode=embedding_mode,
+            provider_options=PROVIDER_OPTIONS,
+        )
+        if distance_metric == "cosine":
+            # HNSWBuilder indexes L2-normalized vectors for cosine, so recomputed passages
+            # must be normalized too, or inner products favor long vectors over close ones.
+            embeddings = normalize_l2(embeddings)
+        return embeddings
+
     def zmq_server_thread_with_shutdown(shutdown_event):
         """ZMQ server thread that respects shutdown signal.
 
@@ -246,12 +261,7 @@ def create_hnsw_embedding_server(
 
             if texts:
                 try:
-                    embeddings = compute_embeddings(
-                        texts,
-                        model_name,
-                        mode=embedding_mode,
-                        provider_options=PROVIDER_OPTIONS,
-                    )
+                    embeddings = _compute_passage_embeddings(texts)
                     logger.info(
                         f"Computed embeddings for {len(texts)} texts, shape: {embeddings.shape}"
                     )
@@ -312,12 +322,7 @@ def create_hnsw_embedding_server(
 
             if texts:
                 try:
-                    embeddings = compute_embeddings(
-                        texts,
-                        model_name,
-                        mode=embedding_mode,
-                        provider_options=PROVIDER_OPTIONS,
-                    )
+                    embeddings = _compute_passage_embeddings(texts)
                     logger.info(
                         f"Computed embeddings for {len(texts)} texts, shape: {embeddings.shape}"
                     )
