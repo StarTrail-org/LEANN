@@ -90,7 +90,7 @@ def test_use_ocr_skips_text_extractors(monkeypatch):
 
     assert module.extract_pdf_with_ocr_fallback("paper.pdf", use_ocr=True) == "ocr markdown"
     assert fitz_calls == []
-    assert parse_calls == [("paper.pdf", {"ocr_mode": "ocr"})]
+    assert parse_calls == [("paper.pdf", {"ocr_mode": "ocr", "tier": "standard", "page_range": ""})]
 
 
 def test_text_extraction_remains_the_default(monkeypatch):
@@ -154,3 +154,128 @@ def test_forced_ocr_without_mineru_raises_import_error(monkeypatch):
     # so only ImportError reaches the user instead of "No documents found".
     with pytest.raises(ImportError, match=r"pip install \"mineru"):
         reader.load_data(Path("scan.pdf"))
+
+
+def _stub_extractor(module, monkeypatch, text_layer, ocr_text="ocr text"):
+    """Replace the extractor and return the OCR calls it receives."""
+    ocr_calls = []
+
+    def extract(path, use_ocr=False, tier="standard", page_range=""):
+        if not use_ocr:
+            return text_layer
+        ocr_calls.append({"tier": tier, "page_range": page_range})
+        return ocr_text
+
+    monkeypatch.setattr(module, "extract_pdf_with_ocr_fallback", extract)
+    return ocr_calls
+
+
+def test_reader_passes_tier_to_ocr(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    ocr_calls = _stub_extractor(module, monkeypatch, text_layer="")
+
+    module.OcrPDFReader(use_ocr=True, tier="basic").load_data(Path("scan.pdf"))
+
+    assert ocr_calls == [{"tier": "basic", "page_range": ""}]
+
+
+def test_auto_detect_ocrs_only_scanned_pages_and_keeps_text_layer(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    text_layer = "text layer " * 20
+    ocr_calls = _stub_extractor(module, monkeypatch, text_layer=text_layer)
+    monkeypatch.setattr(module, "find_scanned_pages", lambda path: [2, 5])
+
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("mixed.pdf"))
+
+    assert ocr_calls == [{"tier": "standard", "page_range": "2,5"}]
+    assert documents[0].text == f"{text_layer}\n\nocr text"
+
+
+def test_auto_detect_keeps_text_layer_when_page_ocr_fails(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    text_layer = "text layer " * 20
+    _stub_extractor(module, monkeypatch, text_layer=text_layer, ocr_text="")
+    monkeypatch.setattr(module, "find_scanned_pages", lambda path: [2])
+
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("mixed.pdf"))
+
+    assert documents[0].text == text_layer
+
+
+def test_auto_detect_skips_ocr_for_text_only_pdf(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    ocr_calls = _stub_extractor(module, monkeypatch, text_layer="text layer " * 20)
+    monkeypatch.setattr(module, "find_scanned_pages", lambda path: [])
+
+    module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("paper.pdf"))
+
+    assert ocr_calls == []
+
+
+def test_ocr_warns_about_model_download_once(monkeypatch, capsys):
+    module = _load_document_rag(monkeypatch)
+    _stub_extractor(module, monkeypatch, text_layer="")
+    reader = module.OcrPDFReader(use_ocr=True)
+
+    reader.load_data(Path("a.pdf"))
+    reader.load_data(Path("b.pdf"))
+
+    assert capsys.readouterr().out.count("downloads") == 1
+
+
+def test_find_scanned_pages_flags_only_image_pages_without_text(monkeypatch, tmp_path):
+    fitz = pytest.importorskip("fitz")
+    module = _load_document_rag(monkeypatch)
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50))
+    pixmap.clear_with(200)
+
+    pdf = fitz.open()
+    pdf.new_page().insert_text((72, 72), "A page with a normal text layer. " * 3)
+    scanned = pdf.new_page()
+    scanned.insert_image(scanned.rect, pixmap=pixmap)
+    figure_only = pdf.new_page()
+    figure_only.insert_image(fitz.Rect(0, 0, 50, 50), pixmap=pixmap)
+    pdf.new_page()
+    path = tmp_path / "mixed.pdf"
+    pdf.save(path)
+    pdf.close()
+
+    assert module.find_scanned_pages(str(path)) == [2]
+
+
+def test_find_scanned_pages_returns_nothing_for_unreadable_pdf(monkeypatch, tmp_path):
+    pytest.importorskip("fitz")
+    module = _load_document_rag(monkeypatch)
+
+    assert module.find_scanned_pages(str(tmp_path / "missing.pdf")) == []
+
+
+def test_file_extractor_adds_images_only_when_ocr_is_forced(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+
+    forced = module.build_file_extractor(use_ocr=True, auto_detect_scanned=False, tier="basic")
+    auto = module.build_file_extractor(use_ocr=False, auto_detect_scanned=True, tier="basic")
+
+    assert set(forced) == {".pdf", ".png", ".jpg", ".jpeg"}
+    assert forced[".png"].use_ocr is True
+    assert forced[".png"].tier == "basic"
+    assert set(auto) == {".pdf"}
+    assert module.build_file_extractor(False, False, "basic") == {}
+
+
+def test_drop_empty_documents_reports_files_with_no_text(monkeypatch, capsys):
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", False)
+    documents = [
+        _LlamaDocument("", {"file_name": "scan.pdf"}),
+        _LlamaDocument("  \n", {"file_name": "paper.pdf"}),
+        _LlamaDocument("real text", {"file_name": "paper.pdf"}),
+    ]
+
+    kept = module.drop_empty_documents(documents)
+
+    assert [document.text for document in kept] == ["real text"]
+    out = capsys.readouterr().out
+    assert "scan.pdf" in out
+    assert "paper.pdf" not in out
+    assert "mineru" in out

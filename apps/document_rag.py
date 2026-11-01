@@ -5,7 +5,7 @@ Supports PDF, TXT, MD, and other document formats.
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -23,7 +23,19 @@ from llama_index.core.readers.base import BaseReader
 OCR_AVAILABLE = importlib.util.find_spec("mineru") is not None
 
 
-def extract_pdf_with_ocr_fallback(pdf_path: str, use_ocr: bool = False) -> str:
+OCR_INSTALL_HINT = 'pip install "mineru>=4.0,<5"'
+OcrTier = Literal["basic", "standard", "advanced"]
+IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg"]
+
+# A page counts as scanned when it has almost no text and images cover most of it.
+# The coverage check keeps blank pages and pages with one small figure out of OCR.
+MAX_SCANNED_PAGE_TEXT_CHARS = 20
+MIN_SCANNED_PAGE_IMAGE_COVERAGE = 0.5
+
+
+def extract_pdf_with_ocr_fallback(
+    pdf_path: str, use_ocr: bool = False, tier: OcrTier = "standard", page_range: str = ""
+) -> str:
     """
     Extract text from PDF with OCR fallback.
     Used as a custom file extractor for SimpleDirectoryReader.
@@ -31,6 +43,8 @@ def extract_pdf_with_ocr_fallback(pdf_path: str, use_ocr: bool = False) -> str:
     Args:
         pdf_path: Path to PDF file
         use_ocr: Whether to force MinerU OCR instead of trying text extraction
+        tier: MinerU quality tier for OCR. "basic" is much faster on CPU but less accurate
+        page_range: Pages to OCR, such as "2,5". Blank means every page
 
     Returns:
         Extracted text string
@@ -40,11 +54,11 @@ def extract_pdf_with_ocr_fallback(pdf_path: str, use_ocr: bool = False) -> str:
     """
     if use_ocr:
         if not OCR_AVAILABLE:
-            raise ImportError('OCR requires MinerU. Install it with: pip install "mineru>=4.0,<5"')
+            raise ImportError(f"OCR requires MinerU. Install it with: {OCR_INSTALL_HINT}")
         try:
             from mineru import parse
 
-            return parse(pdf_path, ocr_mode="ocr").markdown()
+            return parse(pdf_path, ocr_mode="ocr", tier=tier, page_range=page_range).markdown()
         except Exception as e:
             print(f"  OCR failed for {pdf_path}: {e}")
             return ""
@@ -81,10 +95,52 @@ def extract_pdf_with_ocr_fallback(pdf_path: str, use_ocr: bool = False) -> str:
     return ""  # Return empty if all fail
 
 
+def find_scanned_pages(pdf_path: str) -> list[int]:
+    """Return the 1-based numbers of pages that are images with no usable text layer."""
+    try:
+        import fitz  # PyMuPDF
+
+        with fitz.open(pdf_path) as doc:
+            scanned = []
+            for number, page in enumerate(doc, start=1):
+                if len(page.get_text().strip()) > MAX_SCANNED_PAGE_TEXT_CHARS:
+                    continue
+                image_area = sum(
+                    abs(fitz.Rect(image["bbox"]) & page.rect) for image in page.get_image_info()
+                )
+                if image_area / abs(page.rect) >= MIN_SCANNED_PAGE_IMAGE_COVERAGE:
+                    scanned.append(number)
+            return scanned
+    except Exception:
+        return []
+
+
 class OcrPDFReader(BaseReader):
-    def __init__(self, *, use_ocr: bool = False, auto_detect_scanned: bool = False):
+    def __init__(
+        self,
+        *,
+        use_ocr: bool = False,
+        auto_detect_scanned: bool = False,
+        tier: OcrTier = "standard",
+    ):
         self.use_ocr = use_ocr
         self.auto_detect_scanned = auto_detect_scanned
+        self.tier = tier
+        self._download_notice_shown = False
+
+    def _ocr(self, file_path: str, page_range: str = "") -> str:
+        if not self._download_notice_shown:
+            print(
+                f"Running MinerU OCR (tier={self.tier}). "
+                "The first run downloads its models, which take over 1 GB."
+            )
+            self._download_notice_shown = True
+        text = extract_pdf_with_ocr_fallback(
+            file_path, use_ocr=True, tier=self.tier, page_range=page_range
+        )
+        if text:
+            print(f"OCR complete: {Path(file_path).name}")
+        return text
 
     def load_data(
         self,
@@ -93,24 +149,52 @@ class OcrPDFReader(BaseReader):
         **kwargs: Any,
     ) -> list[Document]:
         file_path = str(file)
-        used_ocr = self.use_ocr
-        text = extract_pdf_with_ocr_fallback(file_path, use_ocr=used_ocr)
+        name = Path(file_path).name
+        if self.use_ocr:
+            text = self._ocr(file_path)
+        else:
+            text = extract_pdf_with_ocr_fallback(file_path)
+            if self.auto_detect_scanned:
+                if len(text.strip()) < 100:
+                    print(f"Detected scanned PDF: {name}")
+                    text = self._ocr(file_path)
+                elif scanned_pages := find_scanned_pages(file_path):
+                    print(f"Detected {len(scanned_pages)} scanned page(s) in {name}")
+                    page_range = ",".join(str(page) for page in scanned_pages)
+                    if page_text := self._ocr(file_path, page_range):
+                        text = f"{text}\n\n{page_text}"
 
-        if not used_ocr and self.auto_detect_scanned:
-            if len(text.strip()) < 100:
-                print(f"Detected scanned PDF: {Path(file_path).name}")
-                text = extract_pdf_with_ocr_fallback(file_path, use_ocr=True)
-                used_ocr = True
-
-        if used_ocr and text:
-            print(f"OCR complete: {Path(file_path).name}")
         if not text.strip():
             return []
 
-        metadata = {"file_name": Path(file_path).name}
+        metadata = {"file_name": name}
         if extra_info:
             metadata.update(extra_info)
         return [Document(text=text, metadata=metadata)]
+
+
+def build_file_extractor(
+    use_ocr: bool, auto_detect_scanned: bool, tier: OcrTier
+) -> dict[str, OcrPDFReader]:
+    """Map file extensions to OCR readers. Images are OCRed only when OCR is forced."""
+    if not use_ocr and not auto_detect_scanned:
+        return {}
+    reader = OcrPDFReader(use_ocr=use_ocr, auto_detect_scanned=auto_detect_scanned, tier=tier)
+    extensions = [".pdf", *IMAGE_EXTENSIONS] if use_ocr else [".pdf"]
+    return dict.fromkeys(extensions, reader)
+
+
+def drop_empty_documents(documents: list[Document]) -> list[Document]:
+    """Remove documents with no text and name the files that produced nothing at all."""
+    kept = [document for document in documents if document.text.strip()]
+    kept_files = {document.metadata.get("file_name") for document in kept}
+    all_files = {document.metadata.get("file_name") for document in documents}
+    skipped = sorted(str(name) for name in all_files - kept_files)
+    if skipped:
+        print(f"Skipping {len(skipped)} file(s) with no text: {', '.join(skipped)}")
+        if not OCR_AVAILABLE:
+            print(f"Scanned PDFs need OCR. Install MinerU with: {OCR_INSTALL_HINT}")
+    return kept
 
 
 class DocumentRAG(BaseRAGExample):
@@ -155,7 +239,13 @@ class DocumentRAG(BaseRAGExample):
         ocr_group.add_argument(
             "--use-ocr",
             action="store_true",
-            help="Force OCR processing for all PDFs (even if they contain text)",
+            help="Force OCR for all PDFs (even if they contain text) and for .png/.jpg/.jpeg images",
+        )
+        ocr_group.add_argument(
+            "--ocr-tier",
+            choices=get_args(OcrTier),
+            default="standard",
+            help="MinerU quality tier. basic is faster but less accurate (default: standard)",
         )
         ocr_group.add_argument(
             "--auto-detect-scanned",
@@ -194,17 +284,13 @@ class DocumentRAG(BaseRAGExample):
         if args.file_types:
             reader_kwargs["required_exts"] = args.file_types
 
-        # Add custom PDF extractor if we need OCR
-        if use_ocr_for_all or auto_detect_scanned:
-            reader_kwargs["file_extractor"] = {
-                ".pdf": OcrPDFReader(
-                    use_ocr=use_ocr_for_all,
-                    auto_detect_scanned=auto_detect_scanned,
-                )
-            }
+        # Add custom extractors if we need OCR
+        file_extractor = build_file_extractor(use_ocr_for_all, auto_detect_scanned, args.ocr_tier)
+        if file_extractor:
+            reader_kwargs["file_extractor"] = file_extractor
 
-        documents = SimpleDirectoryReader(args.data_dir, **reader_kwargs).load_data(
-            show_progress=True
+        documents = drop_empty_documents(
+            SimpleDirectoryReader(args.data_dir, **reader_kwargs).load_data(show_progress=True)
         )
 
         if not documents:
@@ -263,7 +349,7 @@ if __name__ == "__main__":
         print("- Use --auto-detect-scanned (default) to automatically detect scanned PDFs")
     else:
         print("\nOCR Support: Install mineru for scanned PDF processing:")
-        print('  pip install "mineru>=4.0,<5"')
+        print(f"  {OCR_INSTALL_HINT}")
     print("\nOr run without --query for interactive mode\n")
 
     rag = DocumentRAG()
