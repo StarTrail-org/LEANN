@@ -3,6 +3,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -140,3 +142,15 @@ def test_ocr_reader_satisfies_simple_directory_reader_contract(monkeypatch):
     assert documents[0].text == "ocr markdown"
     assert documents[0].metadata == {"file_name": "paper.pdf", "source": "test"}
     assert fitz_calls == []
+
+
+def test_forced_ocr_without_mineru_raises_import_error(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", False)
+
+    reader = module.OcrPDFReader(use_ocr=True)
+
+    # SimpleDirectoryReader logs and skips a file on any other exception type,
+    # so only ImportError reaches the user instead of "No documents found".
+    with pytest.raises(ImportError, match=r"pip install \"mineru"):
+        reader.load_data(Path("scan.pdf"))

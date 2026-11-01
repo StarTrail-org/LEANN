@@ -34,10 +34,13 @@ def extract_pdf_with_ocr_fallback(pdf_path: str, use_ocr: bool = False) -> str:
 
     Returns:
         Extracted text string
+
+    Raises:
+        ImportError: If use_ocr is set and MinerU is not installed
     """
     if use_ocr:
         if not OCR_AVAILABLE:
-            return ""
+            raise ImportError('OCR requires MinerU. Install it with: pip install "mineru>=4.0,<5"')
         try:
             from mineru import parse
 
