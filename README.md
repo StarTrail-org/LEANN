@@ -459,6 +459,31 @@ python -m apps.code_rag --repo-dir "./my_codebase" --query "How does authenticat
 
 </details>
 
+<details>
+<summary><strong>📋 Click to expand: Scanned PDFs and images (OCR)</strong></summary>
+
+OCR uses [MinerU](https://github.com/opendatalab/MinerU), which is optional. The first OCR run downloads its models, which take over 1 GB.
+
+```bash
+pip install "mineru>=4.0,<5"
+
+# Auto-detect (the default once MinerU is installed): OCR scanned PDFs and scanned pages inside other PDFs
+python -m apps.document_rag --data-dir "./scans" --query "What does the letter ask for?"
+
+# Force OCR on every PDF, and also on .png, .jpg, and .jpeg files
+python -m apps.document_rag --data-dir "./scans" --use-ocr --query "What does the letter ask for?"
+
+# Use the less accurate basic tier (default: standard)
+python -m apps.document_rag --data-dir "./scans" --use-ocr --ocr-tier basic --query "What does the letter ask for?"
+
+# Turn off auto-detect
+python -m apps.document_rag --data-dir "./scans" --no-auto-detect-scanned --query "What does the letter ask for?"
+```
+
+Do not install `mineru[torch]` in the same environment, because it needs a newer `transformers` than LEANN allows.
+
+</details>
+
 ### 🎨 ColQwen: Multimodal PDF Retrieval with Vision-Language Models
 
 Search through PDFs using both text and visual understanding with ColQwen2/ColPali models. Perfect for research papers, technical documents, and any PDFs with complex layouts, figures, or diagrams.
