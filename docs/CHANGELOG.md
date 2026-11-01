@@ -117,7 +117,7 @@ fixes). Newest entries at the bottom.
   `batch_run_selected.py`, which was already on the current contract, and
   records `agent_seconds` and `latency_seconds` in each result row.
 
-## 2026-11-01: OCR for scanned pages and images
+## 2026-11-01: OCR for scanned pages and images, with an olmOCR-Bench benchmark
 
 - `apps/document_rag.py` now finds image-only pages inside PDFs that also have a text
   layer, and OCRs just those pages. Before, those PDFs skipped OCR and lost the pages.
@@ -125,3 +125,6 @@ fixes). Newest entries at the bottom.
   with "No documents found" and exit code 0.
 - Added `--ocr-tier`, and OCR for `.png`, `.jpg`, and `.jpeg` files.
 - Files with no text are now skipped and named, instead of being indexed as empty chunks.
+- Added `benchmarks/ocr_benchmark/`, which scores OCR with olmOCR's own pass/fail tests.
+  On a sample of 50 PDFs (216 tests), MinerU 4.0.12 passed 76.9% with the `standard` tier
+  and 66.7% with `basic`.

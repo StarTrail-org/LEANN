@@ -480,7 +480,7 @@ python -m apps.document_rag --data-dir "./scans" --use-ocr --ocr-tier basic --qu
 python -m apps.document_rag --data-dir "./scans" --no-auto-detect-scanned --query "What does the letter ask for?"
 ```
 
-Do not install `mineru[torch]` in the same environment, because it needs a newer `transformers` than LEANN allows.
+Do not install `mineru[torch]` in the same environment, because it needs a newer `transformers` than LEANN allows. See [OCR accuracy on olmOCR-Bench](benchmarks/ocr_benchmark/README.md) for test results.
 
 </details>
 
