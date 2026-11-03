@@ -1,11 +1,14 @@
 import json
 import os
+import subprocess
 import threading
 import time
 from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 from leann.embedding_server_manager import EmbeddingServerManager
+from leann.searcher_base import BaseSearcher
 
 
 class DummyProcess:
@@ -388,6 +391,52 @@ def test_corrupted_registry_file_is_recovered_on_start(tmp_path, monkeypatch):
     assert starts == [6030]
     data = json.loads(record_path.read_text(encoding="utf-8"))
     assert data["pid"] == 44444
+
+
+@pytest.mark.parametrize("use_daemon", [True, False])
+def test_start_server_stdio_follows_use_daemon(tmp_path, monkeypatch, use_daemon):
+    popen_kwargs = {}
+
+    def fake_popen(command, **kwargs):
+        popen_kwargs.update(kwargs)
+        return DummyProcess()
+
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setattr("leann.embedding_server_manager.subprocess.Popen", fake_popen)
+    monkeypatch.setattr(
+        "leann.embedding_server_manager._get_available_port", lambda start_port: start_port
+    )
+    monkeypatch.setattr(
+        EmbeddingServerManager, "_registry_dir", staticmethod(lambda: tmp_path / "servers")
+    )
+    monkeypatch.setattr(
+        EmbeddingServerManager, "_wait_for_server_ready", lambda self, port: (True, port)
+    )
+
+    manager = EmbeddingServerManager("leann_backend_hnsw.hnsw_embedding_server")
+    ok, _port = manager.start_server(port=6032, model_name="m", use_daemon=use_daemon)
+    assert ok
+
+    if use_daemon:
+        assert popen_kwargs["stdin"] is subprocess.DEVNULL
+        assert popen_kwargs["stdout"].name.endswith(".log")
+        assert popen_kwargs["stderr"] is subprocess.STDOUT
+        assert popen_kwargs["start_new_session"] is True
+    else:
+        assert popen_kwargs["stdin"] is None
+        assert popen_kwargs["stdout"] is None
+        assert popen_kwargs["stderr"] is None
+        assert popen_kwargs["start_new_session"] is False
+        assert not (tmp_path / "servers").exists()
+
+
+def test_searcher_error_carries_daemon_startup_output():
+    searcher = MagicMock()
+    searcher.embedding_server_manager.start_server.return_value = (False, 5557)
+    searcher.embedding_server_manager.daemon_startup_output.return_value = "No module named x"
+
+    with pytest.raises(RuntimeError, match="port 5557\nNo module named x"):
+        BaseSearcher._ensure_server_running(searcher, "documents.meta.json", None)
 
 
 def test_stop_server_detaches_when_daemon_mode(monkeypatch):

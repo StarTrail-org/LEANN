@@ -3477,7 +3477,7 @@ Examples:
             for record in records:
                 cfg = record.get("config_signature", {})
                 print(
-                    f"- pid={record.get('pid')} port={record.get('port')} backend={record.get('backend_module_name')} model={cfg.get('model_name')}"
+                    f"- pid={record.get('pid')} port={record.get('port')} backend={record.get('backend_module_name')} model={cfg.get('model_name')} log={record.get('log_path')}"
                 )
             return
 

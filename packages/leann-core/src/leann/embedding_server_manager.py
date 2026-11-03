@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+import psutil
+
 from .settings import encode_provider_options
 
 # Lightweight, self-contained server manager with no cross-process inspection
@@ -119,13 +121,8 @@ def _check_port(port: int) -> bool:
 
 def _pid_is_alive(pid: int) -> bool:
     """Best-effort liveness check for a process id."""
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-        return True
-    except OSError:
-        return False
+    # Not os.kill(pid, 0): on Windows signal 0 is CTRL_C_EVENT, not an existence check.
+    return pid > 0 and psutil.pid_exists(pid)
 
 
 # Note: All cross-process scanning helpers removed for simplicity
@@ -230,6 +227,7 @@ class EmbeddingServerManager:
         self._server_config: Optional[dict] = None
         self._daemon_mode = False
         self._registry_path: Optional[Path] = None
+        self._daemon_log_path: Optional[Path] = None
         self._atexit_registered = False
         # Also register a weakref finalizer to ensure cleanup when manager is GC'ed
         try:
@@ -434,6 +432,7 @@ class EmbeddingServerManager:
                 port,
                 provider_options=provider_options,
                 config_signature=config_signature,
+                daemon=bool(kwargs.get("use_daemon", True)),
             )
             started, ready_port = self._wait_for_server_ready(port)
             if started:
@@ -486,6 +485,7 @@ class EmbeddingServerManager:
         *,
         provider_options: Optional[dict] = None,
         config_signature: Optional[dict] = None,
+        daemon: bool = False,
     ) -> None:
         """Launch the server process."""
         project_root = Path(__file__).parent.parent.parent.parent.parent
@@ -511,13 +511,35 @@ class EmbeddingServerManager:
         if encoded_options:
             env["LEANN_EMBEDDING_OPTIONS"] = encoded_options
 
-        self.server_process = subprocess.Popen(
-            command,
-            cwd=project_root,
-            stdout=stdout_target,
-            stderr=stderr_target,
-            env=env,
-        )
+        stdin_target = None
+        daemon_log = None
+        self._daemon_log_path = None
+        if daemon:
+            # A daemon outlives this process, so it can't keep the caller's stdio.
+            # While it holds a stdout/stderr pipe, `python app.py | tee out.log` or
+            # subprocess.run(capture_output=True) sees no EOF until the idle TTL expires.
+            self._daemon_log_path = (
+                self._registry_dir() / f"{self._registry_key(config_signature or {})}.log"
+            )
+            self._daemon_log_path.parent.mkdir(parents=True, exist_ok=True)
+            daemon_log = open(self._daemon_log_path, "wb")
+            stdin_target = subprocess.DEVNULL
+            stdout_target = daemon_log
+            stderr_target = subprocess.STDOUT
+
+        try:
+            self.server_process = subprocess.Popen(
+                command,
+                cwd=project_root,
+                stdin=stdin_target,
+                stdout=stdout_target,
+                stderr=stderr_target,
+                env=env,
+                start_new_session=daemon,  # no effect on Windows
+            )
+        finally:
+            if daemon_log is not None:
+                daemon_log.close()
         self.server_port = port
         # Record config for in-process reuse (best effort; refined later when ready)
         if config_signature is not None:
@@ -577,6 +599,16 @@ class EmbeddingServerManager:
         logger.error(f"Server failed to start within {max_wait} seconds.")
         self.stop_server()
         return False, port
+
+    def daemon_startup_output(self) -> str:
+        """Return the end of the last launched daemon's log, for startup failure errors."""
+        if self._daemon_log_path is None:
+            return ""
+        try:
+            output = self._daemon_log_path.read_bytes()[-2000:].decode("utf-8", errors="replace")
+        except OSError:
+            return ""
+        return f"Embedding server output ({self._daemon_log_path}):\n{output}"
 
     def stop_server(self):
         """Stops the embedding server process if it's running."""
@@ -871,6 +903,7 @@ class EmbeddingServerManager:
                 continue
 
             record["record_path"] = str(record_path)
+            record["log_path"] = str(record_path.with_suffix(".log"))
             records.append(record)
         return records
 

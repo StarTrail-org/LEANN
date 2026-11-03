@@ -116,3 +116,16 @@ fixes). Newest entries at the bottom.
   it would have failed on the unpack. The restored block matches
   `batch_run_selected.py`, which was already on the current contract, and
   records `agent_seconds` and `latency_seconds` in each result row.
+
+## 2026-11-03: Embedding daemons no longer hold the caller's stdout/stderr
+
+- A daemon started through `LeannSearcher`, `LeannChat` or `leann daemon start` inherited the
+  stdio of the process that started it. Anything waiting for EOF on those pipes, such as
+  `python app.py | tee out.log` or `subprocess.run(capture_output=True)`, blocked until the idle
+  TTL expired (900 s by default) even though the program had already finished.
+- Daemons now run in their own session with stdin closed and write to
+  `~/.leann/servers/<registry key>.log`, truncated at each launch. `leann daemon status` prints the
+  path, and the error raised when a daemon fails to start includes the end of that log.
+- Servers started with `use_daemon=False` still share the caller's stdio.
+- `_pid_is_alive` uses `psutil.pid_exists`. `os.kill(pid, 0)` is not an existence check on Windows,
+  where signal 0 is `CTRL_C_EVENT`.
