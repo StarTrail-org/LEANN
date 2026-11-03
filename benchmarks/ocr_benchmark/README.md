@@ -26,18 +26,18 @@ The script downloads the tests and PDFs from Hugging Face. It saves the OCR text
 
 ## Results
 
-These results are from a small sample of 10 PDFs per split (`--max-pdfs 10 --seed 0`), 216 tests in total, so treat them as a rough guide and not as a published score. The run used MinerU 4.0.12 on Windows 11 with an RTX 3060 Laptop GPU (6 GB). GPU memory use peaked at 3.5 GB, against 1.2 GB when idle.
+These results are from a small sample of 10 PDFs per split (`--max-pdfs 10 --seed 0`), 216 tests in total, so treat them as a rough guide and not as a published score. The runs used MinerU 4.0.12 on Windows 11 with an RTX 3060 Laptop GPU (6 GB). GPU memory use peaked at 3.5 GB, against 1.2 GB when idle.
 
-| Split | `basic` | `standard` |
-|---|---|---|
-| `old_scans` | 16/49 (32.7%) | 21/49 (42.9%) |
-| `multi_column` | 30/36 (83.3%) | 32/36 (88.9%) |
-| `long_tiny_text` | 53/61 (86.9%) | 54/61 (88.5%) |
-| `headers_footers` | 21/23 (91.3%) | 23/23 (100%) |
-| `table_tests` | 24/47 (51.1%) | 36/47 (76.6%) |
-| **Total** | **144/216 (66.7%)** | **166/216 (76.9%)** |
-| OCR time for 50 PDFs | 580s | 645s |
+| Split | `flash` | `basic` | `standard` |
+|---|---|---|---|
+| `old_scans` | 16/49 (32.7%) | 16/49 (32.7%) | 21/49 (42.9%) |
+| `multi_column` | 29/36 (80.6%) | 30/36 (83.3%) | 32/36 (88.9%) |
+| `long_tiny_text` | 54/61 (88.5%) | 53/61 (86.9%) | 54/61 (88.5%) |
+| `headers_footers` | 21/23 (91.3%) | 21/23 (91.3%) | 23/23 (100%) |
+| `table_tests` | 1/47 (2.1%) | 24/47 (51.1%) | 36/47 (76.6%) |
+| **Total** | **121/216 (56.0%)** | **144/216 (66.7%)** | **166/216 (76.9%)** |
+| OCR time for 50 PDFs | 340s | 580s | 645s |
 
-`standard` passed more tests in every split and took about 11% longer, so it stays the default in `apps/document_rag.py`. `basic` failed on one `headers_footers` PDF, which returned no text. `standard` failed on none.
+`standard` passed at least as many tests as the other tiers in every split and took about 11% longer than `basic`, so it stays the default in `apps/document_rag.py`. `flash` was the fastest, but it writes tables as plain text instead of Markdown tables, so it fails almost every table test even though the cell text is there. `flash` and `basic` each failed on one `headers_footers` PDF, which returned no text. `standard` failed on none.
 
 `old_scans` scores lowest. Its tests allow few or no character differences, so small misreads fail them. In the handwritten `old_scans/1.pdf`, for example, `standard` read "Desired" where a test expects "Desire".

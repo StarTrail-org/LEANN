@@ -157,7 +157,9 @@ def summarize(results: dict[str, SplitResult], args: argparse.Namespace) -> dict
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--splits", nargs="+", choices=ALL_SPLITS, default=DEFAULT_SPLITS)
-    parser.add_argument("--tier", choices=["basic", "standard", "advanced"], default="basic")
+    parser.add_argument(
+        "--tier", choices=["flash", "basic", "standard", "advanced"], default="standard"
+    )
     parser.add_argument(
         "--max-pdfs",
         type=int,
