@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 torch = pytest.importorskip("torch")
+pytest.importorskip("leann_backend_flashlib_ivf")
 
 
 class _MarkerPayload:

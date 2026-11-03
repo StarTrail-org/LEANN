@@ -17,7 +17,9 @@ class _OffsetMapUnpickler(pickle.Unpickler):
 
 
 def load_offset_map(path: str | Path) -> dict[str, int]:
-    with Path(path).open("rb") as handle:
+    # Builtin open, not Path.open: Path("") normalizes to ".", which would turn the
+    # FileNotFoundError callers rely on for a missing index into IsADirectoryError.
+    with open(path, "rb") as handle:
         data = _OffsetMapUnpickler(handle).load()
 
     if not isinstance(data, dict):
