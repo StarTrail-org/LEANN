@@ -5,7 +5,7 @@ import textwrap
 import time
 from pathlib import Path
 
-from leann.embedding_server_manager import EmbeddingServerManager
+from leann.embedding_server_manager import EmbeddingServerManager, _pid_is_alive
 
 
 def _configure_fake_module_env(monkeypatch):
@@ -113,8 +113,14 @@ def test_daemon_does_not_keep_the_callers_output_open(tmp_path, monkeypatch):
         )
         assert result.returncode == 0, result.stderr
 
+        # list_daemons drops records it considers dead, so capture them first.
+        state = {
+            path.name: path.read_text(encoding="utf-8", errors="replace")[-500:]
+            for path in registry_dir.glob("*")
+            if path.suffix in (".json", ".log")
+        }
         records = EmbeddingServerManager.list_daemons()
-        assert len(records) == 1
+        assert len(records) == 1, f"driver={result.stdout!r} {result.stderr!r} registry={state}"
         assert result.stdout.strip() == str(records[0]["port"])
         assert "fake server" not in result.stdout + result.stderr
 
@@ -128,6 +134,16 @@ def test_daemon_does_not_keep_the_callers_output_open(tmp_path, monkeypatch):
             assert os.getsid(records[0]["pid"]) == records[0]["pid"]
     finally:
         EmbeddingServerManager.stop_daemons(backend_module_name="fake_embedding_server_module")
+
+
+def test_pid_is_alive_follows_a_real_process():
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        assert _pid_is_alive(process.pid)
+    finally:
+        process.kill()
+        process.wait()
+    assert not _pid_is_alive(process.pid)
 
 
 def test_failed_daemon_start_keeps_its_output(tmp_path, monkeypatch):

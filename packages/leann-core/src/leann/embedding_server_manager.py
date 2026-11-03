@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+import psutil
+
 from .settings import encode_provider_options
 
 # Lightweight, self-contained server manager with no cross-process inspection
@@ -119,13 +121,8 @@ def _check_port(port: int) -> bool:
 
 def _pid_is_alive(pid: int) -> bool:
     """Best-effort liveness check for a process id."""
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-        return True
-    except OSError:
-        return False
+    # Not os.kill(pid, 0): on Windows signal 0 is CTRL_C_EVENT, not an existence check.
+    return pid > 0 and psutil.pid_exists(pid)
 
 
 # Note: All cross-process scanning helpers removed for simplicity

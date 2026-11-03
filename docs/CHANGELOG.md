@@ -127,3 +127,5 @@ fixes). Newest entries at the bottom.
   `~/.leann/servers/<registry key>.log`, truncated at each launch. `leann daemon status` prints the
   path, and the error raised when a daemon fails to start includes the end of that log.
 - Servers started with `use_daemon=False` still share the caller's stdio.
+- `_pid_is_alive` uses `psutil.pid_exists`. `os.kill(pid, 0)` is not an existence check on Windows,
+  where signal 0 is `CTRL_C_EVENT`.
