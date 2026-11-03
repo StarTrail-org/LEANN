@@ -182,8 +182,28 @@ jobs:
           if [[ "$ARCH" == "x86_64" ]]; then
             # Install Intel MKL for DiskANN on x86_64
             echo "📦 Installing Intel MKL for x86_64..."
-            wget -q https://registrationcenter-download.intel.com/akdlm/IRC_NAS/79153e0f-74d7-45af-b8c2-258941adf58a/intel-onemkl-2025.0.0.940.sh
-            sudo sh intel-onemkl-2025.0.0.940.sh -a --components intel.oneapi.lin.mkl.devel --action install --eula accept -s
+            MKL_INSTALLER=intel-onemkl-2025.0.0.940.sh
+            MKL_READY=0
+            for attempt in 1 2 3; do
+              echo "MKL installation attempt ${attempt}/3"
+              if wget -q https://registrationcenter-download.intel.com/akdlm/IRC_NAS/79153e0f-74d7-45af-b8c2-258941adf58a/${MKL_INSTALLER} \
+                && sudo sh ${MKL_INSTALLER} -a --components intel.oneapi.lin.mkl.devel \
+                  --action install --eula accept -s
+              then
+                MKL_READY=1
+                break
+              fi
+              if [[ -f /opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_core.so ]]; then
+                echo "Intel MKL files are present after a nonzero installer exit"
+                MKL_READY=1
+                break
+              fi
+              sleep 10
+            done
+            if [[ "$MKL_READY" != "1" ]]; then
+              echo "Intel MKL installation failed after 3 attempts"
+              exit 1
+            fi
             source /opt/intel/oneapi/setvars.sh
             echo "MKLROOT=/opt/intel/oneapi/mkl/latest" >> $GITHUB_ENV
             echo "LD_LIBRARY_PATH=/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin" >> $GITHUB_ENV
