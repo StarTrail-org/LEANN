@@ -129,7 +129,7 @@ class OcrPDFReader(BaseReader):
         self._download_notice_shown = False
 
     def _ocr(self, file_path: str, page_range: str = "") -> str:
-        if not self._download_notice_shown:
+        if OCR_AVAILABLE and not self._download_notice_shown:
             print(
                 f"Running MinerU OCR (tier={self.tier}). "
                 "The first run downloads its models, which take over 1 GB."

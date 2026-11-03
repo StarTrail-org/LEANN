@@ -144,7 +144,7 @@ def test_ocr_reader_satisfies_simple_directory_reader_contract(monkeypatch):
     assert fitz_calls == []
 
 
-def test_forced_ocr_without_mineru_raises_import_error(monkeypatch):
+def test_forced_ocr_without_mineru_raises_import_error(monkeypatch, capsys):
     module = _load_document_rag(monkeypatch)
     monkeypatch.setattr(module, "OCR_AVAILABLE", False)
 
@@ -154,6 +154,7 @@ def test_forced_ocr_without_mineru_raises_import_error(monkeypatch):
     # so only ImportError reaches the user instead of "No documents found".
     with pytest.raises(ImportError, match=r"pip install \"mineru"):
         reader.load_data(Path("scan.pdf"))
+    assert "downloads" not in capsys.readouterr().out
 
 
 def _stub_extractor(module, monkeypatch, text_layer, ocr_text="ocr text"):
@@ -214,6 +215,7 @@ def test_auto_detect_skips_ocr_for_text_only_pdf(monkeypatch):
 
 def test_ocr_warns_about_model_download_once(monkeypatch, capsys):
     module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
     _stub_extractor(module, monkeypatch, text_layer="")
     reader = module.OcrPDFReader(use_ocr=True)
 
