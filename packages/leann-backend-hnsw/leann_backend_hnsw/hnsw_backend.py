@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import shutil
 import time
 from pathlib import Path
@@ -51,8 +52,18 @@ class HNSWBuilder(LeannBackendBuilderInterface):
         self.build_params = kwargs.copy()
         self.is_compact = self.build_params.setdefault("is_compact", True)
         self.is_recompute = self.build_params.setdefault("is_recompute", True)
-        self.M = self.build_params.setdefault("M", 32)
-        self.efConstruction = self.build_params.setdefault("efConstruction", 200)
+        # graph_degree/complexity are the backend-neutral names that `leann build` and the
+        # apps pass; FAISS's own M/efConstruction take precedence when given explicitly.
+        self.M = self.build_params.setdefault("M", self.build_params.get("graph_degree", 32))
+        self.efConstruction = self.build_params.setdefault(
+            "efConstruction", self.build_params.get("complexity", 200)
+        )
+        # Graph construction makes no ZMQ calls, so on Linux it uses every core by default
+        # even though leann pins OpenMP to one thread there for recompute searches (#208).
+        # Elsewhere the process-wide OpenMP setting applies unless num_threads is given.
+        self.num_threads = self.build_params.get("num_threads") or (
+            os.cpu_count() if platform.system() == "Linux" else None
+        )
         self.distance_metric = self.build_params.setdefault("distance_metric", "mips")
         self.dimensions = self.build_params.get("dimensions")
         if not self.is_recompute and self.is_compact:
@@ -86,7 +97,13 @@ class HNSWBuilder(LeannBackendBuilderInterface):
         if self.distance_metric.lower() == "cosine":
             data = normalize_l2(data)
 
-        index.add(data.shape[0], faiss.swig_ptr(data))
+        omp_threads = faiss.omp_get_max_threads()
+        if self.num_threads:
+            faiss.omp_set_num_threads(int(self.num_threads))
+        try:
+            index.add(data.shape[0], faiss.swig_ptr(data))
+        finally:
+            faiss.omp_set_num_threads(omp_threads)
         index_file = index_dir / f"{index_prefix}.index"
         faiss.write_index(index, str(index_file))
 
