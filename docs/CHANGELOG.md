@@ -125,6 +125,6 @@ fixes). Newest entries at the bottom.
   with "No documents found" and exit code 0.
 - Added `--ocr-tier`, and OCR for `.png`, `.jpg`, and `.jpeg` files.
 - Files with no text are now skipped and named, instead of being indexed as empty chunks.
-- Added `benchmarks/ocr_benchmark/`, which scores OCR with olmOCR's own pass/fail tests.
-  On a sample of 50 PDFs (216 tests), MinerU 4.0.12 passed 76.9% with the `standard` tier,
-  66.7% with `basic`, and 56.0% with `flash`.
+- Added `benchmarks/ocr_benchmark/`, which scores OCR with olmOCR's own tests, the way
+  olmOCR's `benchmark.py` does. On a sample of 50 PDFs, MinerU 4.0.12 scored 85.5% with
+  the `advanced` tier, 82.5% with `standard`, 73.2% with `basic`, and 64.8% with `flash`.

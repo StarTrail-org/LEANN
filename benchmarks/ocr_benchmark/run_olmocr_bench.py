@@ -3,8 +3,9 @@
 
 olmOCR-Bench has no full-page transcriptions. Each row is a pass/fail test on one
 PDF, for example "this sentence is present" or "this text comes before that text".
-So this script reports the share of tests passed, using olmOCR's own scorer,
-rather than CER or WER.
+So this script runs olmOCR's own tests rather than computing CER or WER, and scores
+the run the way olmOCR's benchmark.py does: every PDF also gets a baseline test,
+and the score is the average pass rate of the splits and the baseline group.
 
 See README.md in this directory for setup and results.
 """
@@ -15,19 +16,27 @@ import random
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, get_args
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATASET_REPO = "allenai/olmOCR-bench"
 DEFAULT_SPLITS = ["old_scans", "multi_column", "long_tiny_text", "headers_footers", "table_tests"]
 # The math splits are opt-in because scoring them renders equations in a Playwright browser.
 ALL_SPLITS = [*DEFAULT_SPLITS, "arxiv_math", "old_scans_math"]
+# olmOCR adds a baseline test to every PDF that lacks one. It fails blank, repetitive,
+# or wrong-script output, and it counts as its own group in the score.
+BASELINE = "baseline"
 
 
 class BenchTest(Protocol):
     def run(self, content: str) -> tuple[bool, str]: ...
+
+
+LoadTest = Callable[[dict[str, Any]], BenchTest]
+Extract = Callable[..., str]
 
 
 @dataclass
@@ -68,10 +77,25 @@ def select_rows(rows: list[dict[str, Any]], max_pdfs: int, seed: int) -> list[di
     return [row for row in rows if row["pdf"] in chosen]
 
 
+def baseline_row(pdf: str, rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Return the baseline test olmOCR adds to a PDF, or None if its split has one."""
+    if any(row["type"] == BASELINE for row in rows):
+        return None
+    return {"pdf": pdf, "page": 1, "id": f"{pdf}_baseline", "type": BASELINE}
+
+
+def olmocr_score(results: dict[str, SplitResult], baseline: SplitResult) -> float:
+    """Average the pass rates of the splits and the baseline group, as olmOCR does."""
+    rates = [
+        result.overall.rate for result in [*results.values(), baseline] if result.overall.total
+    ]
+    return sum(rates) / len(rates) if rates else 0.0
+
+
 def score_pdf(
     rows: list[dict[str, Any]],
     markdown: str,
-    load_test: Callable[[dict[str, Any]], BenchTest],
+    load_test: LoadTest,
     result: SplitResult,
 ) -> None:
     """Run one PDF's tests against its OCR output and add the outcomes to result."""
@@ -83,7 +107,7 @@ def score_pdf(
 
 
 def extract_cached(
-    pdf_path: Path, cache_path: Path, tier: str, extract: Callable
+    pdf_path: Path, cache_path: Path, tier: str, extract: Extract
 ) -> tuple[str, float]:
     """Return OCR text and the seconds spent, reusing a saved result when there is one."""
     if cache_path.exists():
@@ -99,8 +123,13 @@ def extract_cached(
 
 
 def run_split(
-    split: str, args: argparse.Namespace, extract: Callable, load_test: Callable
+    split: str,
+    args: argparse.Namespace,
+    extract: Extract,
+    load_test: LoadTest,
+    baseline: SplitResult,
 ) -> SplitResult:
+    """OCR a split's sampled PDFs and score them, adding baseline outcomes to baseline."""
     from huggingface_hub import hf_hub_download
 
     tests_file = hf_hub_download(DATASET_REPO, f"bench_data/{split}.jsonl", repo_type="dataset")
@@ -121,6 +150,8 @@ def run_split(
         cache_path = args.output_dir / args.tier / f"{pdf}.md"
         markdown, seconds = extract_cached(pdf_path, cache_path, args.tier, extract)
         score_pdf(pdf_rows, markdown, load_test, result)
+        if extra := baseline_row(pdf, pdf_rows):
+            score_pdf([extra], markdown, load_test, baseline)
         result.pdfs += 1
         result.failed_pdfs += not markdown.strip()
         result.seconds += seconds
@@ -128,7 +159,9 @@ def run_split(
     return result
 
 
-def summarize(results: dict[str, SplitResult], args: argparse.Namespace) -> dict[str, Any]:
+def summarize(
+    results: dict[str, SplitResult], baseline: SplitResult, args: argparse.Namespace
+) -> dict[str, Any]:
     from importlib.metadata import version
 
     return {
@@ -136,6 +169,12 @@ def summarize(results: dict[str, SplitResult], args: argparse.Namespace) -> dict
         "tier": args.tier,
         "max_pdfs_per_split": args.max_pdfs,
         "seed": args.seed,
+        "score": olmocr_score(results, baseline),
+        "baseline": {
+            "passed": baseline.overall.passed,
+            "total": baseline.overall.total,
+            "pass_rate": baseline.overall.rate,
+        },
         "splits": {
             split: {
                 "pdfs": result.pdfs,
@@ -143,7 +182,7 @@ def summarize(results: dict[str, SplitResult], args: argparse.Namespace) -> dict
                 "ocr_seconds": round(result.seconds, 1),
                 "passed": result.overall.passed,
                 "total": result.overall.total,
-                "pass_rate": round(result.overall.rate, 4),
+                "pass_rate": result.overall.rate,
                 "by_type": {
                     name: {"passed": tally.passed, "total": tally.total}
                     for name, tally in sorted(result.by_type.items())
@@ -154,12 +193,10 @@ def summarize(results: dict[str, SplitResult], args: argparse.Namespace) -> dict
     }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(tiers: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--splits", nargs="+", choices=ALL_SPLITS, default=DEFAULT_SPLITS)
-    parser.add_argument(
-        "--tier", choices=["flash", "basic", "standard", "advanced"], default="standard"
-    )
+    parser.add_argument("--tier", choices=tiers, default="standard")
     parser.add_argument(
         "--max-pdfs",
         type=int,
@@ -171,29 +208,34 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=REPO_ROOT / "benchmarks" / "data" / "ocr_benchmark",
-        help="Directory for saved OCR text and summary.json",
+        help="Directory for saved OCR text and summary_<tier>.json",
     )
     return parser.parse_args()
 
 
 def main() -> None:
-    args = parse_args()
-
     sys.path.insert(0, str(REPO_ROOT / "apps"))
-    from document_rag import OCR_AVAILABLE, extract_pdf_with_ocr_fallback
+    from document_rag import (
+        OCR_AVAILABLE,
+        OCR_INSTALL_HINT,
+        OcrTier,
+        extract_pdf_with_ocr_fallback,
+    )
 
+    args = parse_args(get_args(OcrTier))
     if not OCR_AVAILABLE:
-        sys.exit('MinerU is not installed. Run: pip install "mineru>=4.0,<5"')
+        sys.exit(f"MinerU is not installed. Run: {OCR_INSTALL_HINT}")
     try:
         from olmocr.bench.tests import load_single_test
     except ImportError as e:
         sys.exit(f"olmOCR's scorer is not available ({e}). See the setup steps in README.md.")
 
+    baseline = SplitResult()
     results = {
-        split: run_split(split, args, extract_pdf_with_ocr_fallback, load_single_test)
+        split: run_split(split, args, extract_pdf_with_ocr_fallback, load_single_test, baseline)
         for split in args.splits
     }
-    summary = summarize(results, args)
+    summary = summarize(results, baseline, args)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = args.output_dir / f"summary_{args.tier}.json"
@@ -205,6 +247,9 @@ def main() -> None:
             f"{split}: {row['passed']}/{row['total']} tests passed ({row['pass_rate']:.1%}), "
             f"{row['pdfs']} PDFs, {row['failed_pdfs']} failed, {row['ocr_seconds']:.0f}s of OCR"
         )
+    row = summary["baseline"]
+    print(f"{BASELINE}: {row['passed']}/{row['total']} tests passed ({row['pass_rate']:.1%})")
+    print(f"Score (average of the groups above, as olmOCR reports it): {summary['score']:.1%}")
     print(f"Saved {summary_path}")
 
 

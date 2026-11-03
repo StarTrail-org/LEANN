@@ -76,3 +76,32 @@ def test_failed_extraction_is_not_cached(tmp_path):
     assert not cache_path.exists()
     assert bench.extract_cached(Path("a.pdf"), cache_path, "basic", extract)[0] == "ocr text"
     assert bench.extract_cached(Path("a.pdf"), cache_path, "basic", extract) == ("ocr text", 0.0)
+
+
+def test_baseline_row_is_added_only_when_the_split_has_none():
+    bench = _load_benchmark()
+
+    assert bench.baseline_row("a.pdf", [{"type": "present"}]) == {
+        "pdf": "a.pdf",
+        "page": 1,
+        "id": "a.pdf_baseline",
+        "type": "baseline",
+    }
+    assert bench.baseline_row("a.pdf", [{"type": "present"}, {"type": "baseline"}]) is None
+
+
+def test_olmocr_score_averages_group_pass_rates_not_tests():
+    bench = _load_benchmark()
+    one_of_one = bench.SplitResult()
+    one_of_one.by_type["present"].add(True)
+    none_of_three = bench.SplitResult()
+    for _ in range(3):
+        none_of_three.by_type["present"].add(False)
+    baseline = bench.SplitResult()
+    baseline.by_type["baseline"].add(True)
+    baseline.by_type["baseline"].add(False)
+
+    score = bench.olmocr_score({"a": one_of_one, "b": none_of_three}, baseline)
+
+    # (1/1 + 0/3 + 1/2) / 3 groups, not 2 of 6 tests.
+    assert score == 0.5

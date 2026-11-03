@@ -1,8 +1,13 @@
 # OCR accuracy on olmOCR-Bench
 
-`run_olmocr_bench.py` runs LEANN's OCR path (`extract_pdf_with_ocr_fallback` in `apps/document_rag.py`) on [olmOCR-Bench](https://huggingface.co/datasets/allenai/olmOCR-bench) and reports the share of tests passed.
+`run_olmocr_bench.py` runs LEANN's OCR path (`extract_pdf_with_ocr_fallback` in `apps/document_rag.py`, with OCR forced as `--use-ocr` does) on [olmOCR-Bench](https://huggingface.co/datasets/allenai/olmOCR-bench) and scores the output.
 
-The dataset has no full-page transcriptions. Each row is a pass/fail test on one PDF, for example "this sentence is present" or "this text comes before that text". That is why the script uses olmOCR's own scorer rather than CER or WER. If OCR returns no text for a PDF, all of its tests count as failed, because empty output would otherwise pass every "absent" test.
+The dataset has no full-page transcriptions. Each row is a pass/fail test on one PDF, for example "this sentence is present" or "this text comes before that text". So the script runs olmOCR's own tests rather than computing CER or WER, and it scores the run the way olmOCR's `benchmark.py` does:
+
+- Every PDF also gets olmOCR's baseline test, which fails blank, repetitive, or wrong-script output. The baseline tests form their own group.
+- The score is the average pass rate of the splits and the baseline group, not the share of all tests passed.
+
+One rule is stricter than olmOCR's. If OCR returns no text for a PDF, all of its tests count as failed, because empty output would otherwise pass every "absent" test.
 
 ## Setup
 
@@ -26,18 +31,21 @@ The script downloads the tests and PDFs from Hugging Face. It saves the OCR text
 
 ## Results
 
-These results are from a small sample of 10 PDFs per split (`--max-pdfs 10 --seed 0`), 216 tests in total, so treat them as a rough guide and not as a published score. The runs used MinerU 4.0.12 on Windows 11 with an RTX 3060 Laptop GPU (6 GB). GPU memory use peaked at 3.5 GB, against 1.2 GB when idle.
+These results are from a small sample of 10 PDFs per split (`--max-pdfs 10 --seed 0`), so treat them as a rough guide and not as a published score. The runs used MinerU 4.0.12 on Windows 11 with an RTX 3060 Laptop GPU (6 GB). GPU memory use peaked at 3.5 GB with `standard` and `advanced` and at 1.6 GB with `flash`, against 1.2 GB when idle.
 
-| Split | `flash` | `basic` | `standard` |
-|---|---|---|---|
-| `old_scans` | 16/49 (32.7%) | 16/49 (32.7%) | 21/49 (42.9%) |
-| `multi_column` | 29/36 (80.6%) | 30/36 (83.3%) | 32/36 (88.9%) |
-| `long_tiny_text` | 54/61 (88.5%) | 53/61 (86.9%) | 54/61 (88.5%) |
-| `headers_footers` | 21/23 (91.3%) | 21/23 (91.3%) | 23/23 (100%) |
-| `table_tests` | 1/47 (2.1%) | 24/47 (51.1%) | 36/47 (76.6%) |
-| **Total** | **121/216 (56.0%)** | **144/216 (66.7%)** | **166/216 (76.9%)** |
-| OCR time for 50 PDFs | 340s | 580s | 645s |
+| Group | `flash` | `basic` | `standard` | `advanced` |
+|---|---|---|---|---|
+| `old_scans` | 16/49 (32.7%) | 16/49 (32.7%) | 21/49 (42.9%) | 22/49 (44.9%) |
+| `multi_column` | 29/36 (80.6%) | 30/36 (83.3%) | 32/36 (88.9%) | 30/36 (83.3%) |
+| `long_tiny_text` | 54/61 (88.5%) | 53/61 (86.9%) | 54/61 (88.5%) | 57/61 (93.4%) |
+| `headers_footers` | 21/23 (91.3%) | 21/23 (91.3%) | 23/23 (100%) | 23/23 (100%) |
+| `table_tests` | 1/47 (2.1%) | 24/47 (51.1%) | 36/47 (76.6%) | 44/47 (93.6%) |
+| baseline | 46/49 (93.9%) | 46/49 (93.9%) | 48/49 (98.0%) | 48/49 (98.0%) |
+| **Score** | **64.8%** | **73.2%** | **82.5%** | **85.5%** |
+| OCR time for 50 PDFs | 340s | 580s | 645s | 669s |
 
-`standard` passed at least as many tests as the other tiers in every split and took about 11% longer than `basic`, so it stays the default in `apps/document_rag.py`. `flash` was the fastest, but it writes tables as plain text instead of Markdown tables, so it fails almost every table test even though the cell text is there. `flash` and `basic` each failed on one `headers_footers` PDF, which returned no text. `standard` failed on none.
+Running olmOCR's `benchmark.py` on the same OCR output gives the same score for `standard` and `advanced`. For `flash` and `basic` it gives about 1.5 points more (66.3% and 74.6%), because each returned no text for one `headers_footers` PDF, and olmOCR lets that empty output pass the PDF's "absent" tests.
+
+`advanced` scored highest, mostly on tables, and took 4% longer than `standard`. `standard` stays the default in `apps/document_rag.py`, because it is MinerU's own default for `parse()`. `flash` was the fastest, but it writes tables as plain text instead of Markdown tables, so it fails almost every table test even though the cell text is there.
 
 `old_scans` scores lowest. Its tests allow few or no character differences, so small misreads fail them. In the handwritten `old_scans/1.pdf`, for example, `standard` read "Desired" where a test expects "Desire".
