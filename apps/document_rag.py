@@ -24,7 +24,7 @@ OCR_AVAILABLE = importlib.util.find_spec("mineru") is not None
 
 
 OCR_INSTALL_HINT = 'pip install "mineru>=4.0,<5"'
-OcrTier = Literal["basic", "standard", "advanced"]
+OcrTier = Literal["flash", "basic", "standard", "advanced"]
 IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg"]
 
 # A page counts as scanned when it has almost no text and images cover most of it.
@@ -43,7 +43,7 @@ def extract_pdf_with_ocr_fallback(
     Args:
         pdf_path: Path to PDF file
         use_ocr: Whether to force MinerU OCR instead of trying text extraction
-        tier: MinerU quality tier for OCR. "basic" is much faster on CPU but less accurate
+        tier: MinerU quality tier for OCR. "flash" and "basic" are faster on CPU but less accurate
         page_range: Pages to OCR, such as "2,5". Blank means every page
 
     Returns:
@@ -245,7 +245,7 @@ class DocumentRAG(BaseRAGExample):
             "--ocr-tier",
             choices=get_args(OcrTier),
             default="standard",
-            help="MinerU quality tier. basic is faster but less accurate (default: standard)",
+            help="MinerU quality tier, fastest first. Faster tiers are less accurate (default: standard)",
         )
         ocr_group.add_argument(
             "--auto-detect-scanned",
