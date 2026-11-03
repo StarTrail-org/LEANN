@@ -467,13 +467,13 @@ OCR uses [MinerU](https://github.com/opendatalab/MinerU), which is optional. The
 ```bash
 pip install "mineru>=4.0,<5"
 
-# Auto-detect (the default once MinerU is installed): OCR scanned PDFs and scanned pages inside other PDFs
+# Auto-detect (the default once MinerU is installed): OCR images, scanned PDFs, and scanned pages inside other PDFs
 python -m apps.document_rag --data-dir "./scans" --query "What does the letter ask for?"
 
-# Force OCR on every PDF, and also on .png, .jpg, and .jpeg files
+# Force OCR on every PDF, even ones with a text layer
 python -m apps.document_rag --data-dir "./scans" --use-ocr --query "What does the letter ask for?"
 
-# Use the less accurate basic tier (default: standard)
+# Choose a tier: flash, basic, standard (default), or advanced. Faster tiers are less accurate
 python -m apps.document_rag --data-dir "./scans" --use-ocr --ocr-tier basic --query "What does the letter ask for?"
 
 # Turn off auto-detect

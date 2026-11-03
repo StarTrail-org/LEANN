@@ -203,6 +203,16 @@ def test_auto_detect_keeps_text_layer_when_page_ocr_fails(monkeypatch):
     assert documents[0].text == text_layer
 
 
+def test_auto_detect_sends_images_straight_to_ocr(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    ocr_calls = _stub_extractor(module, monkeypatch, text_layer="unused text layer " * 20)
+
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("photo.PNG"))
+
+    assert ocr_calls == [{"tier": "standard", "page_range": ""}]
+    assert documents[0].text == "ocr text"
+
+
 def test_auto_detect_skips_ocr_for_text_only_pdf(monkeypatch):
     module = _load_document_rag(monkeypatch)
     ocr_calls = _stub_extractor(module, monkeypatch, text_layer="text layer " * 20)
@@ -252,16 +262,16 @@ def test_find_scanned_pages_returns_nothing_for_unreadable_pdf(monkeypatch, tmp_
     assert module.find_scanned_pages(str(tmp_path / "missing.pdf")) == []
 
 
-def test_file_extractor_adds_images_only_when_ocr_is_forced(monkeypatch):
+def test_file_extractor_maps_pdfs_and_images_when_ocr_is_on(monkeypatch):
     module = _load_document_rag(monkeypatch)
 
     forced = module.build_file_extractor(use_ocr=True, auto_detect_scanned=False, tier="basic")
     auto = module.build_file_extractor(use_ocr=False, auto_detect_scanned=True, tier="basic")
 
-    assert set(forced) == {".pdf", ".png", ".jpg", ".jpeg"}
+    assert set(forced) == set(auto) == {".pdf", ".png", ".jpg", ".jpeg"}
     assert forced[".png"].use_ocr is True
     assert forced[".png"].tier == "basic"
-    assert set(auto) == {".pdf"}
+    assert auto[".png"].use_ocr is False
     assert module.build_file_extractor(False, False, "basic") == {}
 
 
@@ -281,3 +291,14 @@ def test_drop_empty_documents_reports_files_with_no_text(monkeypatch, capsys):
     assert "scan.pdf" in out
     assert "paper.pdf" not in out
     assert "mineru" in out
+
+
+def test_drop_empty_documents_skips_the_ocr_hint_for_text_files(monkeypatch, capsys):
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", False)
+
+    module.drop_empty_documents([_LlamaDocument("", {"file_name": "notes.txt"})])
+
+    out = capsys.readouterr().out
+    assert "notes.txt" in out
+    assert "mineru" not in out

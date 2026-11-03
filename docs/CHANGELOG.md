@@ -123,5 +123,5 @@ fixes). Newest entries at the bottom.
   layer, and OCRs just those pages. Before, those PDFs skipped OCR and lost the pages.
 - `--use-ocr` now fails with an install command when MinerU is missing. Before, it ended
   with "No documents found" and exit code 0.
-- Added `--ocr-tier` and OCR for `.png`, `.jpg`, and `.jpeg` files under `--use-ocr`.
+- Added `--ocr-tier`, and OCR for `.png`, `.jpg`, and `.jpeg` files.
 - Files with no text are now skipped and named, instead of being indexed as empty chunks.

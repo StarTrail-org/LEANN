@@ -25,7 +25,8 @@ OCR_AVAILABLE = importlib.util.find_spec("mineru") is not None
 
 OCR_INSTALL_HINT = 'pip install "mineru>=4.0,<5"'
 OcrTier = Literal["flash", "basic", "standard", "advanced"]
-IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg"]
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg")
+OCR_EXTENSIONS = (".pdf", *IMAGE_EXTENSIONS)
 
 # A page counts as scanned when it has almost no text and images cover most of it.
 # The coverage check keeps blank pages and pages with one small figure out of OCR.
@@ -150,7 +151,8 @@ class OcrPDFReader(BaseReader):
     ) -> list[Document]:
         file_path = str(file)
         name = Path(file_path).name
-        if self.use_ocr:
+        # An image has no text layer, so it always needs OCR.
+        if self.use_ocr or Path(file_path).suffix.lower() in IMAGE_EXTENSIONS:
             text = self._ocr(file_path)
         else:
             text = extract_pdf_with_ocr_fallback(file_path)
@@ -176,12 +178,11 @@ class OcrPDFReader(BaseReader):
 def build_file_extractor(
     use_ocr: bool, auto_detect_scanned: bool, tier: OcrTier
 ) -> dict[str, OcrPDFReader]:
-    """Map file extensions to OCR readers. Images are OCRed only when OCR is forced."""
+    """Map PDFs and images to an OCR reader, or nothing when OCR is off."""
     if not use_ocr and not auto_detect_scanned:
         return {}
     reader = OcrPDFReader(use_ocr=use_ocr, auto_detect_scanned=auto_detect_scanned, tier=tier)
-    extensions = [".pdf", *IMAGE_EXTENSIONS] if use_ocr else [".pdf"]
-    return dict.fromkeys(extensions, reader)
+    return dict.fromkeys(OCR_EXTENSIONS, reader)
 
 
 def drop_empty_documents(documents: list[Document]) -> list[Document]:
@@ -192,8 +193,10 @@ def drop_empty_documents(documents: list[Document]) -> list[Document]:
     skipped = sorted(str(name) for name in all_files - kept_files)
     if skipped:
         print(f"Skipping {len(skipped)} file(s) with no text: {', '.join(skipped)}")
-        if not OCR_AVAILABLE:
-            print(f"Scanned PDFs need OCR. Install MinerU with: {OCR_INSTALL_HINT}")
+        if not OCR_AVAILABLE and any(
+            Path(name).suffix.lower() in OCR_EXTENSIONS for name in skipped
+        ):
+            print(f"Scanned PDFs and images need OCR. Install MinerU with: {OCR_INSTALL_HINT}")
     return kept
 
 
@@ -239,7 +242,7 @@ class DocumentRAG(BaseRAGExample):
         ocr_group.add_argument(
             "--use-ocr",
             action="store_true",
-            help="Force OCR for all PDFs (even if they contain text) and for .png/.jpg/.jpeg images",
+            help="Force OCR for all PDFs, even those with a text layer",
         )
         ocr_group.add_argument(
             "--ocr-tier",
@@ -251,13 +254,13 @@ class DocumentRAG(BaseRAGExample):
             "--auto-detect-scanned",
             action="store_true",
             default=True,
-            help="Automatically detect and OCR scanned PDFs (default: True)",
+            help="OCR images, scanned PDFs, and scanned pages inside PDFs (default: True)",
         )
         ocr_group.add_argument(
             "--no-auto-detect-scanned",
             dest="auto_detect_scanned",
             action="store_false",
-            help="Disable automatic detection of scanned PDFs",
+            help="Disable automatic OCR of images and scanned PDFs",
         )
 
     async def load_data(self, args) -> list[dict[str, Any]]:
