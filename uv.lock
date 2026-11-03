@@ -2252,7 +2252,7 @@ requires-dist = [
     { name = "tqdm" },
     { name = "transformers", marker = "python_full_version < '3.10'", specifier = "<4.46" },
     { name = "transformers", marker = "python_full_version >= '3.10'", specifier = ">=4.53.1,<4.58" },
-    { name = "tree-sitter", specifier = ">=0.20.0" },
+    { name = "tree-sitter", specifier = ">=0.20.0,!=0.26.0" },
     { name = "tree-sitter-c-sharp", specifier = ">=0.20.0" },
     { name = "tree-sitter-java", specifier = ">=0.20.0" },
     { name = "tree-sitter-python", specifier = ">=0.20.0" },
