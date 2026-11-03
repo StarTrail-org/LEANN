@@ -3,6 +3,7 @@ Document RAG example using the unified interface.
 Supports PDF, TXT, MD, and other document formats.
 """
 
+import re
 import sys
 from pathlib import Path
 from typing import Any, Literal, get_args
@@ -33,6 +34,17 @@ OCR_EXTENSIONS = (".pdf", *IMAGE_EXTENSIONS)
 MAX_SCANNED_PAGE_TEXT_CHARS = 20
 MIN_SCANNED_PAGE_IMAGE_COVERAGE = 0.5
 
+# MinerU's Markdown embeds each figure as a base64 data URI, in Markdown or HTML form.
+# Captions and recognized text are separate blocks, so removing the images loses no text.
+EMBEDDED_IMAGE = re.compile(
+    r"!\[[^\]]*\]\(data:[^)]*\)|<img\b[^>]*\bsrc=[\"']data:[^>]*>", re.IGNORECASE
+)
+
+
+def strip_embedded_images(markdown: str) -> str:
+    """Remove base64 images, which would otherwise fill the index with noise."""
+    return EMBEDDED_IMAGE.sub("", markdown)
+
 
 def extract_pdf_with_ocr_fallback(
     pdf_path: str, use_ocr: bool = False, tier: OcrTier = "standard", page_range: str = ""
@@ -59,7 +71,8 @@ def extract_pdf_with_ocr_fallback(
         try:
             from mineru import parse
 
-            return parse(pdf_path, ocr_mode="ocr", tier=tier, page_range=page_range).markdown()
+            result = parse(pdf_path, ocr_mode="ocr", tier=tier, page_range=page_range)
+            return strip_embedded_images(result.markdown())
         except Exception as e:
             print(f"  OCR failed for {pdf_path}: {e}")
             return ""

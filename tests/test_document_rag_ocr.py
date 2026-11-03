@@ -93,6 +93,27 @@ def test_use_ocr_skips_text_extractors(monkeypatch):
     assert parse_calls == [("paper.pdf", {"ocr_mode": "ocr", "tier": "standard", "page_range": ""})]
 
 
+def test_ocr_output_drops_embedded_images_and_keeps_text(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
+    markdown = (
+        "Figure 1: index layout.\n"
+        "![](data:image/jpeg;base64,/9j/4AAQ+/=)\n"
+        '<td><img src="data:image/png;base64,iVBORw0KGgo="></td><td>cell</td>\n'
+        "See ![diagram](https://example.com/a.png)."
+    )
+    result = types.SimpleNamespace(markdown=lambda: markdown)
+    mineru = types.SimpleNamespace(parse=lambda path, **kwargs: result)
+    monkeypatch.setitem(sys.modules, "mineru", mineru)
+
+    assert module.extract_pdf_with_ocr_fallback("scan.pdf", use_ocr=True) == (
+        "Figure 1: index layout.\n"
+        "\n"
+        "<td></td><td>cell</td>\n"
+        "See ![diagram](https://example.com/a.png)."
+    )
+
+
 def test_text_extraction_remains_the_default(monkeypatch):
     module = _load_document_rag(monkeypatch)
     monkeypatch.setattr(module, "OCR_AVAILABLE", True)
