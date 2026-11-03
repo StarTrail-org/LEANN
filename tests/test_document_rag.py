@@ -45,8 +45,9 @@ def test_document_rag_simulated(test_data_dir):
         env = os.environ.copy()
         env["HF_HUB_DISABLE_SYMLINKS"] = "1"
         env["TOKENIZERS_PARALLELISM"] = "false"
+        env["PYTHONIOENCODING"] = "utf-8"
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=env)
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=600, env=env)
 
         # Check return code
         assert result.returncode == 0, f"Command failed: {result.stderr}"
@@ -87,8 +88,9 @@ def test_document_rag_with_ast_chunking(test_data_dir):
         env = os.environ.copy()
         env["HF_HUB_DISABLE_SYMLINKS"] = "1"
         env["TOKENIZERS_PARALLELISM"] = "false"
+        env["PYTHONIOENCODING"] = "utf-8"
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=env)
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=600, env=env)
 
         # Check return code
         assert result.returncode == 0, f"Command failed: {result.stderr}"
@@ -130,8 +132,9 @@ def test_document_rag_openai(test_data_dir):
 
         env = os.environ.copy()
         env["TOKENIZERS_PARALLELISM"] = "false"
+        env["PYTHONIOENCODING"] = "utf-8"
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=env)
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=600, env=env)
 
         assert result.returncode == 0, f"Command failed: {result.stderr}"
 
@@ -161,7 +164,8 @@ def test_document_rag_error_handling(test_data_dir):
             str(test_data_dir),
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=60, env=env)
 
         # Should fail with invalid LLM type
         assert result.returncode != 0
