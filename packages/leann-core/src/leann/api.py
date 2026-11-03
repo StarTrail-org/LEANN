@@ -23,11 +23,53 @@ from leann.interface import LeannBackendSearcherInterface
 
 from .chat import get_llm
 from .embedding_server_manager import EmbeddingServerManager
+from .index_offsets import load_offset_map
 from .interface import LeannBackendFactoryInterface
 from .metadata_filter import MetadataFilterEngine
 from .registry import BACKEND_REGISTRY, autodiscover_backends
 
 logger = logging.getLogger(__name__)
+
+_EMBEDDINGS_PICKLE_GLOBALS = {
+    ("numpy", "dtype"),
+    ("numpy", "ndarray"),
+    ("numpy.core.multiarray", "_reconstruct"),
+    ("numpy.core.multiarray", "scalar"),
+    ("numpy.core.numeric", "_frombuffer"),
+    ("numpy._core.multiarray", "_reconstruct"),
+    ("numpy._core.multiarray", "scalar"),
+    ("numpy._core.numeric", "_frombuffer"),
+}
+
+
+class _EmbeddingsUnpickler(pickle.Unpickler):
+    def find_class(self, module: str, name: str):
+        if (module, name) in _EMBEDDINGS_PICKLE_GLOBALS:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(
+            f"Global object {module}.{name} is not allowed in an embeddings file"
+        )
+
+    def persistent_load(self, pid):
+        raise pickle.UnpicklingError("Persistent references are not allowed in an embeddings file")
+
+
+def _load_embeddings_pickle(path: str) -> tuple[Any, np.ndarray]:
+    with open(path, "rb") as handle:
+        data = _EmbeddingsUnpickler(handle).load()
+
+    if not isinstance(data, tuple) or len(data) != 2:
+        raise ValueError(
+            f"Invalid embeddings file format. Expected tuple with 2 elements, got {type(data)}"
+        )
+
+    ids, embeddings = data
+    if not isinstance(embeddings, np.ndarray):
+        raise ValueError(f"Expected embeddings to be numpy array, got {type(embeddings)}")
+    if embeddings.dtype.kind in {"O", "V"}:
+        raise ValueError("Embeddings must use a numeric dtype")
+    return ids, embeddings
+
 
 # Passage ID schemes recorded in <index>.meta.json["passage_id_scheme"].
 # - "sequential": today's default; IDs are str(insertion_index) (api.py:add_text).
@@ -238,11 +280,10 @@ class PassageManager:
             if not Path(index_file).exists():
                 raise FileNotFoundError(f"Passage index file not found: {index_file}")
 
-            with open(index_file, "rb") as f:
-                offset_map: dict[str, int] = pickle.load(f)
-                self.offset_maps[passage_file] = offset_map
-                self.passage_files[passage_file] = passage_file
-                self._total_count += len(offset_map)
+            offset_map = load_offset_map(index_file)
+            self.offset_maps[passage_file] = offset_map
+            self.passage_files[passage_file] = passage_file
+            self._total_count += len(offset_map)
 
     def get_passage(self, passage_id: str) -> dict[str, Any]:
         # Fast path: check each shard map (there are typically few shards).
@@ -849,20 +890,7 @@ class LeannBuilder:
             index_path: Path where the index will be saved
             embeddings_file: Path to pickle file containing (ids, embeddings) tuple
         """
-        # Load pre-computed embeddings
-        with open(embeddings_file, "rb") as f:
-            data = pickle.load(f)
-
-        if not isinstance(data, tuple) or len(data) != 2:
-            raise ValueError(
-                f"Invalid embeddings file format. Expected tuple with 2 elements, got {type(data)}"
-            )
-
-        ids, embeddings = data
-
-        if not isinstance(embeddings, np.ndarray):
-            raise ValueError(f"Expected embeddings to be numpy array, got {type(embeddings)}")
-
+        ids, embeddings = _load_embeddings_pickle(embeddings_file)
         self.build_index_from_arrays(index_path, ids, embeddings)
 
     @staticmethod
@@ -920,8 +948,7 @@ class LeannBuilder:
                 f"Index was built with backend '{backend_name}', cannot update with '{self.backend_name}'."
             )
 
-        with open(offset_file, "rb") as f:
-            offset_map: dict[str, int] = pickle.load(f)
+        offset_map = load_offset_map(offset_file)
         existing_ids = set(offset_map.keys())
 
         # IVF: optional delete (for reindex / file-change: remove then re-insert)
