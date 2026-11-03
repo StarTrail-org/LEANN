@@ -1,6 +1,7 @@
 import argparse
 import signal
 import socket
+import sys
 import time
 
 
@@ -31,6 +32,9 @@ def main() -> None:
     server.bind(("127.0.0.1", args.zmq_port))
     server.listen(16)
     server.settimeout(0.2)
+
+    print("fake server stdout", flush=True)
+    print("fake server stderr", file=sys.stderr, flush=True)
 
     try:
         while not stop["value"]:
