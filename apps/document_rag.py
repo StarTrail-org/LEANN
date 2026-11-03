@@ -179,9 +179,7 @@ class OcrPDFReader(BaseReader):
                     if page_text := self._ocr(file_path, page_range):
                         text = f"{text}\n\n{page_text}"
 
-        if not text.strip():
-            return []
-
+        # A file with no text still returns a document, so drop_empty_documents can name it.
         metadata = {"file_name": name}
         if extra_info:
             metadata.update(extra_info)

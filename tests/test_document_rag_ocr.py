@@ -234,6 +234,16 @@ def test_auto_detect_sends_images_straight_to_ocr(monkeypatch):
     assert documents[0].text == "ocr text"
 
 
+def test_image_without_text_is_named_when_skipped(monkeypatch, capsys):
+    module = _load_document_rag(monkeypatch)
+    _stub_extractor(module, monkeypatch, text_layer="", ocr_text="")
+
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("diagram.png"))
+
+    assert module.drop_empty_documents(documents) == []
+    assert "Skipping 1 file(s) with no text: diagram.png" in capsys.readouterr().out
+
+
 def test_auto_detect_skips_ocr_for_text_only_pdf(monkeypatch):
     module = _load_document_rag(monkeypatch)
     ocr_calls = _stub_extractor(module, monkeypatch, text_layer="text layer " * 20)
