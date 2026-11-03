@@ -1303,11 +1303,16 @@ def get_llm(llm_config: Optional[dict[str, Any]] = None) -> LLMInterface:
     elif llm_type == "gemini":
         return GeminiChat(model=model or "gemini-2.5-flash", api_key=llm_config.get("api_key"))
     elif llm_type == "anthropic":
-        return AnthropicChat(
-            model=model or "claude-haiku-4-5",
-            api_key=llm_config.get("api_key"),
-            base_url=llm_config.get("base_url"),
-        )
+        # The default model is AnthropicChat's signature default and nothing else.
+        # Naming it here as well is what let the two drift apart: the factory went on
+        # building a model Anthropic had retired long after the class had moved off it.
+        anthropic_kwargs: dict[str, Any] = {
+            "api_key": llm_config.get("api_key"),
+            "base_url": llm_config.get("base_url"),
+        }
+        if model:
+            anthropic_kwargs["model"] = model
+        return AnthropicChat(**anthropic_kwargs)
     elif llm_type == "minimax":
         return MiniMaxChat(
             model=model or "MiniMax-M2.5",
