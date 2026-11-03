@@ -161,7 +161,7 @@ def test_export_command_preserves_sources(monkeypatch, tmp_path, capsys):
     assert len(paths) == 1
     assert paths[0].parent == tmp_path
     assert paths[0].name.startswith("example-com-source-")
-    text = paths[0].read_text()
+    text = paths[0].read_text(encoding="utf-8")
     assert text.startswith("# A source\n\nSource: https://example.com/../../source\n")
     assert "Useful café snippet" in text
     assert "Exported 1" in capsys.readouterr().out
