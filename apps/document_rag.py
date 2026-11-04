@@ -119,8 +119,10 @@ def find_scanned_pages(pdf_path: str) -> list[int]:
             for number, page in enumerate(doc, start=1):
                 if len(page.get_text().strip()) > MAX_SCANNED_PAGE_TEXT_CHARS:
                     continue
+                # Image boxes ignore the page's rotation, so rotate them to match page.rect.
                 image_area = sum(
-                    abs(fitz.Rect(image["bbox"]) & page.rect) for image in page.get_image_info()
+                    abs(fitz.Rect(image["bbox"]) * page.rotation_matrix & page.rect)
+                    for image in page.get_image_info()
                 )
                 if image_area / abs(page.rect) >= MIN_SCANNED_PAGE_IMAGE_COVERAGE:
                     scanned.append(number)
@@ -153,8 +155,20 @@ class OcrPDFReader(BaseReader):
             file_path, use_ocr=True, tier=self.tier, page_range=page_range
         )
         if text:
-            print(f"OCR complete: {Path(file_path).name}")
+            pages = f", page {page_range}" if page_range else ""
+            print(f"OCR complete: {Path(file_path).name}{pages}")
         return text
+
+    def _ocr_scanned_pages(self, file_path: str, scanned_pages: list[int]) -> str:
+        """Replace the text of each scanned page with its OCR text, in page order."""
+        import fitz  # PyMuPDF
+
+        with fitz.open(file_path) as doc:
+            pages = [page.get_text() for page in doc]
+        # One page per call keeps each OCR result at its own page. MinerU loads its models once.
+        for number in scanned_pages:
+            pages[number - 1] = self._ocr(file_path, str(number))
+        return "\n".join(pages)
 
     def load_data(
         self,
@@ -175,12 +189,10 @@ class OcrPDFReader(BaseReader):
                     text = self._ocr(file_path)
                 elif scanned_pages := find_scanned_pages(file_path):
                     print(f"Detected {len(scanned_pages)} scanned page(s) in {name}")
-                    page_range = ",".join(str(page) for page in scanned_pages)
-                    if page_text := self._ocr(file_path, page_range):
-                        text = f"{text}\n\n{page_text}"
+                    text = self._ocr_scanned_pages(file_path, scanned_pages)
 
         # A file with no text still returns a document, so drop_empty_documents can name it.
-        metadata = {"file_name": name}
+        metadata = {"file_path": file_path, "file_name": name}
         if extra_info:
             metadata.update(extra_info)
         return [Document(text=text, metadata=metadata)]
@@ -198,9 +210,10 @@ def build_file_extractor(
 
 def drop_empty_documents(documents: list[Document]) -> list[Document]:
     """Remove documents with no text and name the files that produced nothing at all."""
+    # Paths, not names: a recursive load can find two files with the same name.
     kept = [document for document in documents if document.text.strip()]
-    kept_files = {document.metadata.get("file_name") for document in kept}
-    all_files = {document.metadata.get("file_name") for document in documents}
+    kept_files = {document.metadata.get("file_path") for document in kept}
+    all_files = {document.metadata.get("file_path") for document in documents}
     skipped = sorted(str(name) for name in all_files - kept_files)
     if skipped:
         print(f"Skipping {len(skipped)} file(s) with no text: {', '.join(skipped)}")

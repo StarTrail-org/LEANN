@@ -161,7 +161,11 @@ def test_ocr_reader_satisfies_simple_directory_reader_contract(monkeypatch):
 
     assert len(documents) == 1
     assert documents[0].text == "ocr markdown"
-    assert documents[0].metadata == {"file_name": "paper.pdf", "source": "test"}
+    assert documents[0].metadata == {
+        "file_path": "paper.pdf",
+        "file_name": "paper.pdf",
+        "source": "test",
+    }
     assert fitz_calls == []
 
 
@@ -201,27 +205,37 @@ def test_reader_passes_tier_to_ocr(monkeypatch):
     assert ocr_calls == [{"tier": "basic", "page_range": ""}]
 
 
-def test_auto_detect_ocrs_only_scanned_pages_and_keeps_text_layer(monkeypatch):
+def _save_pdf(fitz, path, pages):
+    """Save a PDF with one page per entry: text for a text page, None for a scanned one."""
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50))
+    pixmap.clear_with(200)
+    pdf = fitz.open()
+    for text in pages:
+        page = pdf.new_page()
+        if text is None:
+            page.insert_image(page.rect, pixmap=pixmap)
+        else:
+            page.insert_text((72, 72), text)
+    pdf.save(path)
+    pdf.close()
+
+
+def test_auto_detect_ocrs_only_scanned_pages_in_page_order(monkeypatch, tmp_path):
+    fitz = pytest.importorskip("fitz")
     module = _load_document_rag(monkeypatch)
-    text_layer = "text layer " * 20
-    ocr_calls = _stub_extractor(module, monkeypatch, text_layer=text_layer)
-    monkeypatch.setattr(module, "find_scanned_pages", lambda path: [2, 5])
+    path = tmp_path / "mixed.pdf"
+    _save_pdf(fitz, path, ["First page.", None, "Third page.", None])
 
-    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("mixed.pdf"))
+    def extract(path, use_ocr=False, tier="standard", page_range=""):
+        return f"OCR of page {page_range}." if use_ocr else "text layer " * 20
 
-    assert ocr_calls == [{"tier": "standard", "page_range": "2,5"}]
-    assert documents[0].text == f"{text_layer}\n\nocr text"
+    monkeypatch.setattr(module, "extract_pdf_with_ocr_fallback", extract)
 
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(path)
 
-def test_auto_detect_keeps_text_layer_when_page_ocr_fails(monkeypatch):
-    module = _load_document_rag(monkeypatch)
-    text_layer = "text layer " * 20
-    _stub_extractor(module, monkeypatch, text_layer=text_layer, ocr_text="")
-    monkeypatch.setattr(module, "find_scanned_pages", lambda path: [2])
-
-    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(Path("mixed.pdf"))
-
-    assert documents[0].text == text_layer
+    assert documents[0].text.split() == (
+        "First page. OCR of page 2. Third page. OCR of page 4.".split()
+    )
 
 
 def test_auto_detect_sends_images_straight_to_ocr(monkeypatch):
@@ -279,11 +293,15 @@ def test_find_scanned_pages_flags_only_image_pages_without_text(monkeypatch, tmp
     figure_only = pdf.new_page()
     figure_only.insert_image(fitz.Rect(0, 0, 50, 50), pixmap=pixmap)
     pdf.new_page()
+    # A tall page turned sideways: its image box must be rotated to cover the page.
+    rotated = pdf.new_page(width=300, height=900)
+    rotated.insert_image(rotated.rect, pixmap=pixmap, keep_proportion=False)
+    rotated.set_rotation(90)
     path = tmp_path / "mixed.pdf"
     pdf.save(path)
     pdf.close()
 
-    assert module.find_scanned_pages(str(path)) == [2]
+    assert module.find_scanned_pages(str(path)) == [2, 5]
 
 
 def test_find_scanned_pages_returns_nothing_for_unreadable_pdf(monkeypatch, tmp_path):
@@ -310,17 +328,17 @@ def test_drop_empty_documents_reports_files_with_no_text(monkeypatch, capsys):
     module = _load_document_rag(monkeypatch)
     monkeypatch.setattr(module, "OCR_AVAILABLE", False)
     documents = [
-        _LlamaDocument("", {"file_name": "scan.pdf"}),
-        _LlamaDocument("  \n", {"file_name": "paper.pdf"}),
-        _LlamaDocument("real text", {"file_name": "paper.pdf"}),
+        _LlamaDocument("", {"file_path": "a/scan.pdf"}),
+        _LlamaDocument("real text", {"file_path": "b/scan.pdf"}),
+        _LlamaDocument("  \n", {"file_path": "paper.pdf"}),
+        _LlamaDocument("real text", {"file_path": "paper.pdf"}),
     ]
 
     kept = module.drop_empty_documents(documents)
 
-    assert [document.text for document in kept] == ["real text"]
+    assert [document.text for document in kept] == ["real text", "real text"]
     out = capsys.readouterr().out
-    assert "scan.pdf" in out
-    assert "paper.pdf" not in out
+    assert "Skipping 1 file(s) with no text: a/scan.pdf\n" in out
     assert "mineru" in out
 
 
@@ -328,7 +346,7 @@ def test_drop_empty_documents_skips_the_ocr_hint_for_text_files(monkeypatch, cap
     module = _load_document_rag(monkeypatch)
     monkeypatch.setattr(module, "OCR_AVAILABLE", False)
 
-    module.drop_empty_documents([_LlamaDocument("", {"file_name": "notes.txt"})])
+    module.drop_empty_documents([_LlamaDocument("", {"file_path": "notes.txt"})])
 
     out = capsys.readouterr().out
     assert "notes.txt" in out
