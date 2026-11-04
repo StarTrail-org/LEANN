@@ -304,11 +304,12 @@ def test_find_scanned_pages_flags_only_image_pages_without_text(monkeypatch, tmp
     assert module.find_scanned_pages(str(path)) == [2, 5]
 
 
-def test_find_scanned_pages_returns_nothing_for_unreadable_pdf(monkeypatch, tmp_path):
+def test_find_scanned_pages_reports_an_unreadable_pdf(monkeypatch, tmp_path, capsys):
     pytest.importorskip("fitz")
     module = _load_document_rag(monkeypatch)
 
     assert module.find_scanned_pages(str(tmp_path / "missing.pdf")) == []
+    assert "Could not check missing.pdf for scanned pages" in capsys.readouterr().out
 
 
 def test_file_extractor_maps_pdfs_and_images_when_ocr_is_on(monkeypatch):

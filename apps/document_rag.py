@@ -127,7 +127,9 @@ def find_scanned_pages(pdf_path: str) -> list[int]:
                 if image_area / abs(page.rect) >= MIN_SCANNED_PAGE_IMAGE_COVERAGE:
                     scanned.append(number)
             return scanned
-    except Exception:
+    except Exception as e:
+        # The text layer is still indexed, so say why its scanned pages were not checked.
+        print(f"Could not check {Path(pdf_path).name} for scanned pages: {e}")
         return []
 
 
