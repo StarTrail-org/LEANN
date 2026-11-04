@@ -32,7 +32,11 @@ BASELINE = "baseline"
 
 
 class BenchTest(Protocol):
-    def run(self, content: str) -> tuple[bool, str]: ...
+    """One olmOCR-Bench test, as loaded by olmocr.bench.tests."""
+
+    def run(self, content: str) -> tuple[bool, str]:
+        """Return whether the OCR text passes, and the reason when it fails."""
+        ...
 
 
 LoadTest = Callable[[dict[str, Any]], BenchTest]
@@ -41,20 +45,26 @@ Extract = Callable[..., str]
 
 @dataclass
 class Tally:
+    """Count of passed tests out of the tests run."""
+
     passed: int = 0
     total: int = 0
 
     def add(self, passed: bool) -> None:
+        """Record one test outcome."""
         self.passed += passed
         self.total += 1
 
     @property
     def rate(self) -> float:
+        """Fraction of tests passed, or 0.0 when none ran."""
         return self.passed / self.total if self.total else 0.0
 
 
 @dataclass
 class SplitResult:
+    """Test outcomes, PDF counts, and OCR time for one split."""
+
     by_type: dict[str, Tally] = field(default_factory=lambda: defaultdict(Tally))
     pdfs: int = 0
     failed_pdfs: int = 0
@@ -62,6 +72,7 @@ class SplitResult:
 
     @property
     def overall(self) -> Tally:
+        """All of the split's test outcomes, across test types."""
         return Tally(
             passed=sum(t.passed for t in self.by_type.values()),
             total=sum(t.total for t in self.by_type.values()),
@@ -162,6 +173,7 @@ def run_split(
 def summarize(
     results: dict[str, SplitResult], baseline: SplitResult, args: argparse.Namespace
 ) -> dict[str, Any]:
+    """Collect the run's settings, score, and per-split results for summary_<tier>.json."""
     from importlib.metadata import version
 
     return {
@@ -194,6 +206,7 @@ def summarize(
 
 
 def parse_args(tiers: Sequence[str]) -> argparse.Namespace:
+    """Parse the command line, offering the given MinerU tiers for --tier."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--splits", nargs="+", choices=ALL_SPLITS, default=DEFAULT_SPLITS)
     parser.add_argument("--tier", choices=tiers, default="standard")
@@ -214,6 +227,7 @@ def parse_args(tiers: Sequence[str]) -> argparse.Namespace:
 
 
 def main() -> None:
+    """OCR the sampled PDFs, score them, and print and save the results."""
     sys.path.insert(0, str(REPO_ROOT / "apps"))
     from document_rag import (
         OCR_AVAILABLE,
