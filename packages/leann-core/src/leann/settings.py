@@ -16,6 +16,7 @@ _DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 _DEFAULT_MINIMAX_BASE_URL = "https://api.minimax.io/v1"
 _DEFAULT_NOVITA_BASE_URL = "https://api.novita.ai/openai"
 _DEFAULT_ATLASCLOUD_BASE_URL = "https://api.atlascloud.ai/v1"
+_DEFAULT_UBERLLM_BASE_URL = "https://api.uberllm.dev/v1"
 
 
 def _clean_url(value: str) -> str:
@@ -219,6 +220,31 @@ def resolve_atlascloud_api_key(explicit: str | None = None) -> str | None:
         return explicit
 
     return os.getenv("ATLASCLOUD_API_KEY") or os.getenv("ATLAS_CLOUD_API_KEY")
+
+
+def resolve_uberllm_base_url(explicit: str | None = None) -> str:
+    """Resolve the base URL for the UberLLM OpenAI-compatible API."""
+
+    candidates = (
+        explicit,
+        os.getenv("LEANN_UBERLLM_BASE_URL"),
+        os.getenv("UBERLLM_BASE_URL"),
+    )
+
+    for candidate in candidates:
+        if candidate:
+            return _clean_url(candidate)
+
+    return _clean_url(_DEFAULT_UBERLLM_BASE_URL)
+
+
+def resolve_uberllm_api_key(explicit: str | None = None) -> str | None:
+    """Resolve the API key for UberLLM."""
+
+    if explicit:
+        return explicit
+
+    return os.getenv("UBERLLM_API_KEY")
 
 
 def encode_provider_options(options: dict[str, Any] | None) -> str | None:
