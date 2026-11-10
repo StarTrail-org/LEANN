@@ -37,6 +37,8 @@ try:
         resolve_ollama_host,
         resolve_openai_api_key,
         resolve_openai_base_url,
+        resolve_uberllm_api_key,
+        resolve_uberllm_base_url,
     )
 except ImportError:
     # Minimal fallbacks if settings helpers are unavailable
@@ -67,6 +69,12 @@ except ImportError:
             or os.getenv("ATLAS_CLOUD_BASE_URL")
             or "https://api.atlascloud.ai/v1"
         )
+
+    def resolve_uberllm_api_key(value: str | None) -> str | None:
+        return value or os.getenv("UBERLLM_API_KEY")
+
+    def resolve_uberllm_base_url(value: str | None) -> str | None:
+        return value or os.getenv("UBERLLM_BASE_URL") or "https://api.uberllm.dev/v1"
 
 
 dotenv.load_dotenv()
@@ -169,8 +177,9 @@ class BaseRAGExample(ABC):
                 "atlascloud",
                 "atlas-cloud",
                 "atlas",
+                "uberllm",
             ],
-            help="LLM backend: openai, ollama, hf, litellm, atlascloud, or simulated (default: openai)",
+            help="LLM backend: openai, ollama, hf, litellm, atlascloud, uberllm, or simulated (default: openai)",
         )
         llm_group.add_argument(
             "--llm-model",
@@ -318,6 +327,12 @@ class BaseRAGExample(ABC):
             config["model"] = args.llm_model or "deepseek-ai/deepseek-v4-pro"
             config["base_url"] = resolve_atlascloud_base_url(args.llm_api_base)
             resolved_key = resolve_atlascloud_api_key(args.llm_api_key)
+            if resolved_key:
+                config["api_key"] = resolved_key
+        elif args.llm == "uberllm":
+            config["model"] = args.llm_model or "deepseek/deepseek-v4-pro"
+            config["base_url"] = resolve_uberllm_base_url(args.llm_api_base)
+            resolved_key = resolve_uberllm_api_key(args.llm_api_key)
             if resolved_key:
                 config["api_key"] = resolved_key
         elif args.llm == "ollama":

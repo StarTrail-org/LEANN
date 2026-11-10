@@ -32,6 +32,8 @@ from .settings import (
     resolve_ollama_host,
     resolve_openai_api_key,
     resolve_openai_base_url,
+    resolve_uberllm_api_key,
+    resolve_uberllm_base_url,
 )
 from .sync import DEFAULT_INDEX_EXTENSIONS, FileSynchronizer, parse_include_extensions
 
@@ -720,6 +722,7 @@ Examples:
                 "atlascloud",
                 "atlas-cloud",
                 "atlas",
+                "uberllm",
             ],
             help="LLM provider (default: ollama)",
         )
@@ -806,6 +809,7 @@ Examples:
                 "atlascloud",
                 "atlas-cloud",
                 "atlas",
+                "uberllm",
             ],
             help="LLM provider (default: ollama)",
         )
@@ -3573,6 +3577,13 @@ Examples:
             resolved_api_key = resolve_atlascloud_api_key(args.api_key)
             if resolved_api_key:
                 llm_config["api_key"] = resolved_api_key
+        elif args.llm == "uberllm":
+            if args.model == "qwen3:8b":
+                llm_config["model"] = "deepseek/deepseek-v4-pro"
+            llm_config["base_url"] = resolve_uberllm_base_url(args.api_base)
+            resolved_api_key = resolve_uberllm_api_key(args.api_key)
+            if resolved_api_key:
+                llm_config["api_key"] = resolved_api_key
 
         # Parse --metadata-filters JSON string (mirrors `leann search`).
         # Run before constructing LeannChat so invalid filters fail fast without
@@ -3875,6 +3886,13 @@ Examples:
                 llm_config["model"] = "deepseek-ai/deepseek-v4-pro"
             llm_config["base_url"] = resolve_atlascloud_base_url(args.api_base)
             resolved_api_key = resolve_atlascloud_api_key(args.api_key)
+            if resolved_api_key:
+                llm_config["api_key"] = resolved_api_key
+        elif args.llm == "uberllm":
+            if args.model == "qwen3:8b":
+                llm_config["model"] = "deepseek/deepseek-v4-pro"
+            llm_config["base_url"] = resolve_uberllm_base_url(args.api_base)
+            resolved_api_key = resolve_uberllm_api_key(args.api_key)
             if resolved_api_key:
                 llm_config["api_key"] = resolved_api_key
 

@@ -24,6 +24,8 @@ from .settings import (
     resolve_ollama_host,
     resolve_openai_api_key,
     resolve_openai_base_url,
+    resolve_uberllm_api_key,
+    resolve_uberllm_base_url,
 )
 
 # Configure logging
@@ -1145,6 +1147,65 @@ class AtlasCloudChat(LLMInterface):
             return f"Error: Could not get a response from Atlas Cloud. Details: {e}"
 
 
+class UberLLMChat(LLMInterface):
+    """LLM interface for UberLLM models via the OpenAI-compatible API."""
+
+    def __init__(
+        self,
+        model: str = "deepseek/deepseek-v4-pro",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        self.model = model
+        self.base_url = resolve_uberllm_base_url(base_url)
+        self.api_key = resolve_uberllm_api_key(api_key)
+
+        if not self.api_key:
+            raise ValueError(
+                "UberLLM API key is required. Set UBERLLM_API_KEY environment variable or pass api_key parameter."
+            )
+
+        logger.info(
+            "Initializing UberLLM Chat with model='%s' and base_url='%s'",
+            model,
+            self.base_url,
+        )
+
+        try:
+            import openai
+
+            self.client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
+        except ImportError:
+            raise ImportError(
+                "The 'openai' library is required for UberLLM models. Please install it with 'pip install openai'."
+            )
+
+    def ask(self, prompt: str, **kwargs) -> str:
+        params = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": kwargs.get("temperature", 0.7),
+            "max_tokens": kwargs.get("max_tokens", 1000),
+        }
+
+        if "top_p" in kwargs:
+            params["top_p"] = kwargs["top_p"]
+
+        logger.info(f"Sending request to UberLLM with model {self.model}")
+
+        try:
+            response = cast(Any, self.client.chat.completions).create(**params)
+            logger.info(
+                f"Total tokens = {response.usage.total_tokens}, prompt tokens = {response.usage.prompt_tokens}, completion tokens = {response.usage.completion_tokens}"
+            )
+            if response.choices[0].finish_reason == "length":
+                logger.warning("The query is exceeding the maximum allowed number of tokens")
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error communicating with UberLLM: {e}")
+            return f"Error: Could not get a response from UberLLM. Details: {e}"
+
+
 class LiteLLMChat(LLMInterface):
     """LLM interface for 100+ providers through LiteLLM's unified gateway.
 
@@ -1323,6 +1384,12 @@ def get_llm(llm_config: Optional[dict[str, Any]] = None) -> LLMInterface:
     elif llm_type in {"atlascloud", "atlas-cloud", "atlas"}:
         return AtlasCloudChat(
             model=model or "deepseek-ai/deepseek-v4-pro",
+            api_key=llm_config.get("api_key"),
+            base_url=llm_config.get("base_url"),
+        )
+    elif llm_type == "uberllm":
+        return UberLLMChat(
+            model=model or "deepseek/deepseek-v4-pro",
             api_key=llm_config.get("api_key"),
             base_url=llm_config.get("base_url"),
         )
