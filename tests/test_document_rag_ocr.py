@@ -352,3 +352,25 @@ def test_drop_empty_documents_skips_the_ocr_hint_for_text_files(monkeypatch, cap
     out = capsys.readouterr().out
     assert "notes.txt" in out
     assert "mineru" not in out
+
+
+def test_short_text_layer_survives_a_failed_ocr_attempt(monkeypatch):
+    """Auto-detect must not discard text it already has when OCR yields nothing.
+
+    A page with a usable but short text layer trips the <100-char scanned
+    heuristic. Overwriting `text` with the OCR result unconditionally meant a
+    failed or unavailable OCR turned those characters into no document at all.
+    """
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
+    short_text = "Camp Hill Pa. Aug 2 1912\nDear Sir\n"
+
+    def fake_extract(path, use_ocr=False, **kwargs):
+        return "" if use_ocr else short_text
+
+    monkeypatch.setattr(module, "extract_pdf_with_ocr_fallback", fake_extract)
+
+    reader = module.OcrPDFReader(use_ocr=False, auto_detect_scanned=True)
+    documents = reader.load_data(Path("letter.pdf"))
+
+    assert [document.text for document in documents] == [short_text]
