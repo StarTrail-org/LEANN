@@ -188,7 +188,11 @@ class OcrPDFReader(BaseReader):
             if self.auto_detect_scanned:
                 if len(text.strip()) < 100:
                     print(f"Detected scanned PDF: {name}")
-                    text = self._ocr(file_path)
+                    # Only take the OCR result when it produced something. Overwriting
+                    # unconditionally discards a short-but-real text layer whenever OCR
+                    # fails or MinerU is absent, so the file contributes nothing at all.
+                    if ocr_text := self._ocr(file_path):
+                        text = ocr_text
                 elif scanned_pages := find_scanned_pages(file_path):
                     print(f"Detected {len(scanned_pages)} scanned page(s) in {name}")
                     text = self._ocr_scanned_pages(file_path, scanned_pages)
