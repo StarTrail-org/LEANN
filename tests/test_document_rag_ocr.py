@@ -169,17 +169,14 @@ def test_ocr_reader_satisfies_simple_directory_reader_contract(monkeypatch):
     assert fitz_calls == []
 
 
-def test_forced_ocr_without_mineru_raises_import_error(monkeypatch, capsys):
+def test_forced_ocr_without_mineru_fails_before_reading_files(monkeypatch):
     module = _load_document_rag(monkeypatch)
     monkeypatch.setattr(module, "OCR_AVAILABLE", False)
 
-    reader = module.OcrPDFReader(use_ocr=True)
-
-    # SimpleDirectoryReader logs and skips a file on any other exception type,
-    # so only ImportError reaches the user instead of "No documents found".
     with pytest.raises(ImportError, match=r"pip install \"mineru"):
-        reader.load_data(Path("scan.pdf"))
-    assert "downloads" not in capsys.readouterr().out
+        module.OcrPDFReader(use_ocr=True)
+    with pytest.raises(ImportError, match=r"pip install \"mineru"):
+        module.build_file_extractor(use_ocr=True, auto_detect_scanned=False, tier="standard")
 
 
 def _stub_extractor(module, monkeypatch, text_layer, ocr_text="ocr text"):
@@ -198,6 +195,7 @@ def _stub_extractor(module, monkeypatch, text_layer, ocr_text="ocr text"):
 
 def test_reader_passes_tier_to_ocr(monkeypatch):
     module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
     ocr_calls = _stub_extractor(module, monkeypatch, text_layer="")
 
     module.OcrPDFReader(use_ocr=True, tier="basic").load_data(Path("scan.pdf"))
@@ -314,6 +312,7 @@ def test_find_scanned_pages_reports_an_unreadable_pdf(monkeypatch, tmp_path, cap
 
 def test_file_extractor_maps_pdfs_and_images_when_ocr_is_on(monkeypatch):
     module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
 
     forced = module.build_file_extractor(use_ocr=True, auto_detect_scanned=False, tier="basic")
     auto = module.build_file_extractor(use_ocr=False, auto_detect_scanned=True, tier="basic")

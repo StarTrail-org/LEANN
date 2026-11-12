@@ -61,13 +61,8 @@ def extract_pdf_with_ocr_fallback(
 
     Returns:
         Extracted text string
-
-    Raises:
-        ImportError: If use_ocr is set and MinerU is not installed
     """
     if use_ocr:
-        if not OCR_AVAILABLE:
-            raise ImportError(f"OCR requires MinerU. Install it with: {OCR_INSTALL_HINT}")
         try:
             from mineru import parse
 
@@ -141,6 +136,10 @@ class OcrPDFReader(BaseReader):
         auto_detect_scanned: bool = False,
         tier: OcrTier = "standard",
     ):
+        # Fail before any file is read: forced OCR skips the text layer, so without
+        # MinerU every PDF would come out empty.
+        if use_ocr and not OCR_AVAILABLE:
+            raise ImportError(f"Forced OCR requires MinerU. Install it with: {OCR_INSTALL_HINT}")
         self.use_ocr = use_ocr
         self.auto_detect_scanned = auto_detect_scanned
         self.tier = tier
