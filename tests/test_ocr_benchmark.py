@@ -1,5 +1,8 @@
+import argparse
+import importlib.metadata
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -105,3 +108,25 @@ def test_olmocr_score_averages_group_pass_rates_not_tests():
 
     # (1/1 + 0/3 + 1/2) / 3 groups, not 2 of 6 tests.
     assert score == 0.5
+
+
+def test_rerun_reuses_saved_ocr_only_for_the_same_mineru_version(tmp_path, monkeypatch):
+    installed = {"mineru": "4.0.12"}
+    monkeypatch.setattr(importlib.metadata, "version", installed.__getitem__)
+    bench = _load_benchmark()
+    tests_file = tmp_path / "split.jsonl"
+    tests_file.write_text('{"pdf": "a.pdf", "page": 1, "id": "a_1", "type": "present"}\n')
+    hub = types.SimpleNamespace(hf_hub_download=lambda repo, name, repo_type: str(tests_file))
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    args = argparse.Namespace(max_pdfs=-1, seed=0, output_dir=tmp_path / "out", tier="standard")
+    ocr_calls = []
+
+    def extract(path, use_ocr, tier):
+        ocr_calls.append(path)
+        return "ocr text"
+
+    for mineru_version in ["4.0.12", "4.0.12", "4.1.0"]:
+        installed["mineru"] = mineru_version
+        bench.run_split("split", args, extract, lambda row: _AlwaysPass(), bench.SplitResult())
+
+    assert len(ocr_calls) == 2

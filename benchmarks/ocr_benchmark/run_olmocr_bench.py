@@ -18,6 +18,7 @@ import time
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Callable, Protocol, get_args
 
@@ -153,12 +154,14 @@ def run_split(
     for row in rows:
         rows_by_pdf[row["pdf"]].append(row)
 
+    # Saved OCR text is kept per MinerU version, so an upgrade does not reuse older output.
+    cache_dir = args.output_dir / f"mineru-{version('mineru')}" / args.tier
     result = SplitResult()
     for number, (pdf, pdf_rows) in enumerate(sorted(rows_by_pdf.items()), start=1):
         pdf_path = Path(
             hf_hub_download(DATASET_REPO, f"bench_data/pdfs/{pdf}", repo_type="dataset")
         )
-        cache_path = args.output_dir / args.tier / f"{pdf}.md"
+        cache_path = cache_dir / f"{pdf}.md"
         markdown, seconds = extract_cached(pdf_path, cache_path, args.tier, extract)
         score_pdf(pdf_rows, markdown, load_test, result)
         if extra := baseline_row(pdf, pdf_rows):
@@ -174,8 +177,6 @@ def summarize(
     results: dict[str, SplitResult], baseline: SplitResult, args: argparse.Namespace
 ) -> dict[str, Any]:
     """Collect the run's settings, score, and per-split results for summary_<tier>.json."""
-    from importlib.metadata import version
-
     return {
         "mineru_version": version("mineru"),
         "tier": args.tier,

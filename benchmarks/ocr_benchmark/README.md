@@ -25,7 +25,7 @@ pip install fuzzysearch rapidfuzz playwright beautifulsoup4 lxml
 python benchmarks/ocr_benchmark/run_olmocr_bench.py --tier standard --max-pdfs 10
 ```
 
-The script downloads the tests and PDFs from Hugging Face. It saves the OCR text and `summary_<tier>.json` to `benchmarks/data/ocr_benchmark/`, which git ignores. A rerun reuses saved OCR text.
+The script downloads the tests and PDFs from Hugging Face. It saves the OCR text and `summary_<tier>.json` to `benchmarks/data/ocr_benchmark/`, which git ignores. A rerun with the same MinerU version and tier reuses saved OCR text.
 
 `arxiv_math` and `old_scans_math` are off by default. To score them, pass them to `--splits` and run `playwright install chromium`, because their tests render equations in a browser.
 
