@@ -36,14 +36,20 @@ MIN_SCANNED_PAGE_IMAGE_COVERAGE = 0.5
 
 # MinerU's Markdown embeds each figure as a base64 data URI, in Markdown or HTML form.
 # Captions and recognized text are separate blocks, so removing the images loses no text.
-EMBEDDED_IMAGE = re.compile(
-    r"!\[[^\]]*\]\(data:[^)]*\)|<img\b[^>]*\bsrc=[\"']data:[^>]*>", re.IGNORECASE
-)
+# An <img> tag is matched whole and its src checked apart, and no match runs into the next
+# image, so broken markup cannot make the scan slow. Base64 has no brackets or whitespace.
+EMBEDDED_IMAGE = re.compile(r"!\[[^\[\]\n]*\]\(data:[^()\s]*\)|<img\b[^<>]*>", re.IGNORECASE)
+DATA_URI_SRC = re.compile(r"\bsrc=[\"']data:", re.IGNORECASE)
 
 
 def strip_embedded_images(markdown: str) -> str:
     """Remove base64 images, which would otherwise fill the index with noise."""
-    return EMBEDDED_IMAGE.sub("", markdown)
+
+    def strip(image: re.Match[str]) -> str:
+        tag = image.group()
+        return "" if tag.startswith("!") or DATA_URI_SRC.search(tag) else tag
+
+    return EMBEDDED_IMAGE.sub(strip, markdown)
 
 
 def extract_pdf_with_ocr_fallback(

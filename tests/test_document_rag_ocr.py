@@ -100,7 +100,9 @@ def test_ocr_output_drops_embedded_images_and_keeps_text(monkeypatch):
         "Figure 1: index layout.\n"
         "![](data:image/jpeg;base64,/9j/4AAQ+/=)\n"
         '<td><img src="data:image/png;base64,iVBORw0KGgo="></td><td>cell</td>\n'
-        "See ![diagram](https://example.com/a.png)."
+        '<img alt="logo" src="https://example.com/logo.png">\n'
+        "See ![diagram](https://example.com/a.png).\n"
+        '<img src="data:unclosed'
     )
     result = types.SimpleNamespace(markdown=lambda: markdown)
     mineru = types.SimpleNamespace(parse=lambda path, **kwargs: result)
@@ -110,7 +112,9 @@ def test_ocr_output_drops_embedded_images_and_keeps_text(monkeypatch):
         "Figure 1: index layout.\n"
         "\n"
         "<td></td><td>cell</td>\n"
-        "See ![diagram](https://example.com/a.png)."
+        '<img alt="logo" src="https://example.com/logo.png">\n'
+        "See ![diagram](https://example.com/a.png).\n"
+        '<img src="data:unclosed'
     )
 
 
