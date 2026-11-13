@@ -373,3 +373,39 @@ def test_short_text_layer_survives_a_failed_ocr_attempt(monkeypatch):
     documents = reader.load_data(Path("letter.pdf"))
 
     assert [document.text for document in documents] == [short_text]
+
+
+def _fail_ocr(monkeypatch, module):
+    monkeypatch.setattr(module.OcrPDFReader, "_ocr", lambda self, path, page_range="": "")
+
+
+def test_failed_ocr_keeps_a_real_short_text_layer(monkeypatch, tmp_path):
+    fitz = pytest.importorskip("fitz")
+    module = _load_document_rag(monkeypatch)
+    _fail_ocr(monkeypatch, module)
+    path = tmp_path / "letter.pdf"
+    _save_pdf(fitz, path, ["Camp Hill Pa. Aug 2 1912"])
+
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(path)
+
+    assert documents[0].text.strip() == "Camp Hill Pa. Aug 2 1912"
+
+
+def test_failed_page_ocr_keeps_the_page_text(monkeypatch, tmp_path):
+    fitz = pytest.importorskip("fitz")
+    module = _load_document_rag(monkeypatch)
+    _fail_ocr(monkeypatch, module)
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50))
+    pixmap.clear_with(200)
+    pdf = fitz.open()
+    pdf.new_page().insert_text((72, 72), "A full text page.\n" * 10)
+    scanned = pdf.new_page()
+    scanned.insert_image(scanned.rect, pixmap=pixmap)
+    scanned.insert_text((72, 800), "7")
+    path = tmp_path / "mixed.pdf"
+    pdf.save(path)
+    pdf.close()
+
+    documents = module.OcrPDFReader(auto_detect_scanned=True).load_data(path)
+
+    assert documents[0].text.split() == ("A full text page.\n" * 10 + "7").split()

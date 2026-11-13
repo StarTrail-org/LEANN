@@ -72,6 +72,9 @@ def extract_pdf_with_ocr_fallback(
             print(f"  OCR failed for {pdf_path}: {e}")
             return ""
 
+    # A short text layer is returned rather than dropped, so a failed OCR pass cannot lose it.
+    short_text = ""
+
     # Try PyMuPDF first
     try:
         import fitz  # PyMuPDF
@@ -84,6 +87,7 @@ def extract_pdf_with_ocr_fallback(
 
         if text and len(text.strip()) > 100:
             return text
+        short_text = text
     except Exception:
         pass
 
@@ -98,10 +102,12 @@ def extract_pdf_with_ocr_fallback(
 
         if text and len(text.strip()) > 100:
             return text
+        if not short_text.strip():
+            short_text = text
     except Exception:
         pass
 
-    return ""  # Return empty if all fail
+    return short_text
 
 
 def find_scanned_pages(pdf_path: str) -> list[int]:
@@ -168,7 +174,7 @@ class OcrPDFReader(BaseReader):
             pages = [page.get_text() for page in doc]
         # One page per call keeps each OCR result at its own page. MinerU loads its models once.
         for number in scanned_pages:
-            pages[number - 1] = self._ocr(file_path, str(number))
+            pages[number - 1] = self._ocr(file_path, str(number)) or pages[number - 1]
         return "\n".join(pages)
 
     def load_data(
