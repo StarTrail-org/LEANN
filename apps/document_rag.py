@@ -73,7 +73,8 @@ def extract_pdf_with_ocr_fallback(
             from mineru import parse
 
             result = parse(pdf_path, ocr_mode="ocr", tier=tier, page_range=page_range)
-            return strip_embedded_images(result.markdown())
+            # Stripped, so a page MinerU reads as figures only comes back empty, not as whitespace.
+            return strip_embedded_images(result.markdown()).strip()
         except Exception as e:
             print(f"  OCR failed for {pdf_path}: {e}")
             return ""

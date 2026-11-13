@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -116,6 +117,16 @@ def test_ocr_output_drops_embedded_images_and_keeps_text(monkeypatch):
         "See ![diagram](https://example.com/a.png).\n"
         '<img src="data:unclosed'
     )
+
+
+def test_image_stripping_stays_fast_on_broken_markup(monkeypatch):
+    module = _load_document_rag(monkeypatch)
+    # Scanning past every unclosed tag made this take over 20 seconds.
+    broken = "<img " * 20_000
+
+    start = time.perf_counter()
+    assert module.strip_embedded_images(broken) == broken
+    assert time.perf_counter() - start < 1
 
 
 def test_text_extraction_remains_the_default(monkeypatch):
@@ -379,14 +390,19 @@ def test_short_text_layer_survives_a_failed_ocr_attempt(monkeypatch):
     assert [document.text for document in documents] == [short_text]
 
 
-def _fail_ocr(monkeypatch, module):
-    monkeypatch.setattr(module.OcrPDFReader, "_ocr", lambda self, path, page_range="": "")
+def _ocr_finds_only_figures(monkeypatch, module):
+    # Once the images are stripped, MinerU's Markdown for such a page is only whitespace.
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
+    figures = "![](data:image/png;base64,AAAA)\n\n![](data:image/png;base64,BBBB)\n"
+    result = types.SimpleNamespace(markdown=lambda: figures)
+    mineru = types.SimpleNamespace(parse=lambda path, **kwargs: result)
+    monkeypatch.setitem(sys.modules, "mineru", mineru)
 
 
 def test_failed_ocr_keeps_a_real_short_text_layer(monkeypatch, tmp_path):
     fitz = pytest.importorskip("fitz")
     module = _load_document_rag(monkeypatch)
-    _fail_ocr(monkeypatch, module)
+    _ocr_finds_only_figures(monkeypatch, module)
     path = tmp_path / "letter.pdf"
     _save_pdf(fitz, path, ["Camp Hill Pa. Aug 2 1912"])
 
@@ -398,7 +414,7 @@ def test_failed_ocr_keeps_a_real_short_text_layer(monkeypatch, tmp_path):
 def test_failed_page_ocr_keeps_the_page_text(monkeypatch, tmp_path):
     fitz = pytest.importorskip("fitz")
     module = _load_document_rag(monkeypatch)
-    _fail_ocr(monkeypatch, module)
+    _ocr_finds_only_figures(monkeypatch, module)
     pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50))
     pixmap.clear_with(200)
     pdf = fitz.open()
