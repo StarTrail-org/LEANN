@@ -1,3 +1,5 @@
+import argparse
+import asyncio
 import importlib.util
 import sys
 import time
@@ -236,10 +238,26 @@ def test_forced_ocr_without_mineru_is_refused(monkeypatch):
 
     try:
         module.OcrPDFReader(use_ocr=True)
-    except ValueError as exc:
+    except ImportError as exc:
         assert "mineru" in str(exc).lower()
     else:
         raise AssertionError("forced OCR was accepted without MinerU installed")
+
+
+def test_forced_ocr_without_mineru_exits_with_the_install_command(monkeypatch, tmp_path):
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", False)
+    args = argparse.Namespace(
+        data_dir=str(tmp_path),
+        file_types=None,
+        use_ocr=True,
+        auto_detect_scanned=True,
+        ocr_tier="standard",
+    )
+    rag = module.DocumentRAG.__new__(module.DocumentRAG)
+
+    with pytest.raises(SystemExit, match=r"Install it with: pip install \"mineru"):
+        asyncio.run(rag.load_data(args))
 
 
 def test_auto_detect_without_mineru_still_constructs(monkeypatch):
