@@ -80,6 +80,12 @@ def extract_pdf_with_ocr_fallback(pdf_path: str, use_ocr: bool = False) -> str:
 
 class OcrPDFReader(BaseReader):
     def __init__(self, *, use_ocr: bool = False, auto_detect_scanned: bool = False):
+        if use_ocr and not OCR_AVAILABLE:
+            raise ValueError(
+                "Forced OCR requires MinerU, which is not installed. It skips "
+                "text extraction entirely, so every PDF would contribute no "
+                'text at all. Install it with: pip install "mineru>=4.0,<5"'
+            )
         self.use_ocr = use_ocr
         self.auto_detect_scanned = auto_detect_scanned
 
@@ -93,10 +99,14 @@ class OcrPDFReader(BaseReader):
         used_ocr = self.use_ocr
         text = extract_pdf_with_ocr_fallback(file_path, use_ocr=used_ocr)
 
-        if not used_ocr and self.auto_detect_scanned:
-            if len(text.strip()) < 100:
-                print(f"Detected scanned PDF: {Path(file_path).name}")
-                text = extract_pdf_with_ocr_fallback(file_path, use_ocr=True)
+        if not used_ocr and self.auto_detect_scanned and len(text.strip()) < 100:
+            print(f"Detected scanned PDF: {Path(file_path).name}")
+            ocr_text = extract_pdf_with_ocr_fallback(file_path, use_ocr=True)
+            # Only take the OCR result if it produced something. Overwriting
+            # unconditionally discarded a short-but-real text layer whenever OCR
+            # failed, so the page ended up contributing nothing at all.
+            if ocr_text.strip():
+                text = ocr_text
                 used_ocr = True
 
         if used_ocr and text:

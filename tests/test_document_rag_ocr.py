@@ -140,3 +140,70 @@ def test_ocr_reader_satisfies_simple_directory_reader_contract(monkeypatch):
     assert documents[0].text == "ocr markdown"
     assert documents[0].metadata == {"file_name": "paper.pdf", "source": "test"}
     assert fitz_calls == []
+
+
+def test_short_text_layer_survives_a_failed_ocr_attempt(monkeypatch, tmp_path):
+    """Auto-detect must not discard text it already has when OCR yields nothing.
+
+    A page with a usable but short text layer trips the <100-char scanned
+    heuristic. Overwriting `text` with the OCR result unconditionally meant a
+    failed or unavailable OCR turned those characters into no document at all.
+    """
+    module = _load_document_rag(monkeypatch)
+    short_text = "Camp Hill Pa. Aug 2 1912\nDear Sir\n"
+
+    def fake_extract(path, use_ocr=False):
+        return "" if use_ocr else short_text
+
+    monkeypatch.setattr(module, "extract_pdf_with_ocr_fallback", fake_extract)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
+
+    reader = module.OcrPDFReader(use_ocr=False, auto_detect_scanned=True)
+    docs = reader.load_data(tmp_path / "scan.pdf")
+
+    assert len(docs) == 1
+    assert docs[0].text == short_text
+
+
+def test_successful_ocr_still_replaces_a_short_text_layer(monkeypatch, tmp_path):
+    """The guard above must not stop a working OCR pass from taking over."""
+    module = _load_document_rag(monkeypatch)
+
+    def fake_extract(path, use_ocr=False):
+        return "full page recovered by ocr" if use_ocr else "tiny"
+
+    monkeypatch.setattr(module, "extract_pdf_with_ocr_fallback", fake_extract)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", True)
+
+    reader = module.OcrPDFReader(use_ocr=False, auto_detect_scanned=True)
+    docs = reader.load_data(tmp_path / "scan.pdf")
+
+    assert len(docs) == 1
+    assert docs[0].text == "full page recovered by ocr"
+
+
+def test_forced_ocr_without_mineru_is_refused(monkeypatch):
+    """Forced OCR skips text extraction, so without MinerU every PDF yields "".
+
+    That produced an index with no PDF content and nothing printed. Forced OCR
+    is an explicit demand, so refuse it at construction rather than silently
+    indexing nothing.
+    """
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", False)
+
+    try:
+        module.OcrPDFReader(use_ocr=True)
+    except ValueError as exc:
+        assert "mineru" in str(exc).lower()
+    else:
+        raise AssertionError("forced OCR was accepted without MinerU installed")
+
+
+def test_auto_detect_without_mineru_still_constructs(monkeypatch):
+    """Auto-detect is opportunistic, so it must not raise when MinerU is absent."""
+    module = _load_document_rag(monkeypatch)
+    monkeypatch.setattr(module, "OCR_AVAILABLE", False)
+
+    reader = module.OcrPDFReader(use_ocr=False, auto_detect_scanned=True)
+    assert reader.use_ocr is False
