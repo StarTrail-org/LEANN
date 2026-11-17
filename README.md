@@ -913,6 +913,10 @@ Once your iMessage conversations are indexed, you can search with queries like:
 without an API key: `python -m apps.parallel_rag` searches, indexes, and answers in one
 command, or export Markdown for `leann build`.
 
+**Web pages:** [Search and scrape with Outcrawl](docs/outcrawl.md) using an
+`OUTCRAWL_API_KEY`: `python -m apps.outcrawl_rag --scrape` indexes whole result pages
+as Markdown, or export them for `leann build`.
+
 Connect to live data sources through the Model Context Protocol (MCP). LEANN now supports real-time RAG on platforms like Slack, Twitter, and more through standardized MCP servers.
 
 **Key Benefits:**
