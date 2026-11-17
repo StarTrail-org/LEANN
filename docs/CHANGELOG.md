@@ -129,8 +129,6 @@ fixes). Newest entries at the bottom.
 
 - `apps/document_rag.py` now finds image-only pages inside PDFs that also have a text
   layer, and OCRs just those pages. Before, those PDFs skipped OCR and lost the pages.
-- `--use-ocr` now fails with an install command when MinerU is missing. Before, it ended
-  with "No documents found" and exit code 0.
 - Added `--ocr-tier`, and OCR for `.png`, `.jpg`, and `.jpeg` files.
 - Files with no text are now skipped and named, instead of being indexed as empty chunks.
 
@@ -146,3 +144,22 @@ fixes). Newest entries at the bottom.
 - Servers started with `use_daemon=False` still share the caller's stdio.
 - `_pid_is_alive` uses `psutil.pid_exists`. `os.kill(pid, 0)` is not an existence check on Windows,
   where signal 0 is `CTRL_C_EVENT`.
+
+## 2026-11-10: Stop forced OCR from silently indexing nothing
+
+- `--use-ocr` without MinerU installed produced an index with no PDF content
+  and printed nothing. Forced OCR skips text extraction entirely, so
+  `extract_pdf_with_ocr_fallback` returned `""` for every file, `OcrPDFReader`
+  turned that into zero documents, and a PDF with a perfectly good text layer
+  contributed nothing. Verified through `SimpleDirectoryReader` rather than
+  the extractor alone: `--use-ocr` on a text-layer PDF yielded 0 documents.
+  `OcrPDFReader.__init__` now refuses `use_ocr=True` when MinerU is missing,
+  which covers both the CLI flag and direct construction with one check.
+  Auto-detection stays opportunistic and still tolerates an empty OCR result.
+- Auto-detection discarded text it already had. A page whose text layer is
+  usable but under the 100-character scanned-PDF threshold had `text`
+  overwritten with the OCR result unconditionally, so a failed or unavailable
+  OCR pass turned those characters into no document at all. The OCR result is
+  now only taken when it is non-empty: a 33-character text layer went from 0
+  documents to 1.
+- Both are from the OCR work merged in #190, in the half #440 did not cover.

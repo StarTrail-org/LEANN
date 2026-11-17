@@ -149,10 +149,12 @@ class OcrPDFReader(BaseReader):
         auto_detect_scanned: bool = False,
         tier: OcrTier = "standard",
     ):
-        # Fail before any file is read: forced OCR skips the text layer, so without
-        # MinerU every PDF would come out empty.
         if use_ocr and not OCR_AVAILABLE:
-            raise ImportError(f"Forced OCR requires MinerU. Install it with: {OCR_INSTALL_HINT}")
+            raise ValueError(
+                "Forced OCR requires MinerU, which is not installed. It skips "
+                "text extraction entirely, so every PDF would contribute no "
+                f"text at all. Install it with: {OCR_INSTALL_HINT}"
+            )
         self.use_ocr = use_ocr
         self.auto_detect_scanned = auto_detect_scanned
         self.tier = tier
