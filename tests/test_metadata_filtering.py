@@ -312,7 +312,7 @@ class TestPassageManagerFiltering:
         """Test filtering SearchResult objects."""
         # Create a real PassageManager instance just for the filtering method
         # We'll mock the file operations
-        with patch("builtins.open"), patch("json.loads"), patch("pickle.load"):
+        with patch("builtins.open"), patch("json.loads"), patch("leann.api.load_offset_map"):
             pm = PassageManager([{"type": "jsonl", "path": "test.jsonl"}])
 
             filters = {"chapter": {"<=": 5}}
@@ -324,7 +324,7 @@ class TestPassageManagerFiltering:
 
     def test_filter_search_results_no_filters(self):
         """Test that None filters return all results."""
-        with patch("builtins.open"), patch("json.loads"), patch("pickle.load"):
+        with patch("builtins.open"), patch("json.loads"), patch("leann.api.load_offset_map"):
             pm = PassageManager([{"type": "jsonl", "path": "test.jsonl"}])
 
             result = pm.filter_search_results(self.search_results, None)
@@ -332,7 +332,7 @@ class TestPassageManagerFiltering:
 
     def test_filter_maintains_search_result_type(self):
         """Test that filtering returns SearchResult objects."""
-        with patch("builtins.open"), patch("json.loads"), patch("pickle.load"):
+        with patch("builtins.open"), patch("json.loads"), patch("leann.api.load_offset_map"):
             pm = PassageManager([{"type": "jsonl", "path": "test.jsonl"}])
 
             filters = {"character": {"==": "Alice"}}

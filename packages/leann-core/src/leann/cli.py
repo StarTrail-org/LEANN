@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 from .api import Fts5BM25Index, LeannBuilder, LeannChat, LeannSearcher
 from .embedding_server_manager import EmbeddingServerManager
+from .index_offsets import load_offset_map
 from .interactive_utils import create_cli_session
 from .registry import DEFAULT_INDEX_SCAN_DEPTH, iter_index_meta_files, register_project_directory
 from .settings import (
@@ -400,12 +401,23 @@ Examples:
             help="Force full rebuild of existing index (without this, build does incremental update: add new files only)",
         )
         build_parser.add_argument(
-            "--graph-degree", type=int, default=32, help="Graph degree (default: 32)"
+            "--graph-degree",
+            type=int,
+            default=None,
+            help="Graph degree (default: backend's own; HNSW M=32, DiskANN 32)",
         )
         build_parser.add_argument(
-            "--complexity", type=int, default=64, help="Build complexity (default: 64)"
+            "--complexity",
+            type=int,
+            default=None,
+            help="Build complexity (default: backend's own; HNSW efConstruction=200, DiskANN 64)",
         )
-        build_parser.add_argument("--num-threads", type=int, default=1)
+        build_parser.add_argument(
+            "--num-threads",
+            type=int,
+            default=None,
+            help="Build threads (default: backend's own; HNSW all cores on Linux, DiskANN 8)",
+        )
         build_parser.add_argument(
             "--compact",
             action=argparse.BooleanOptionalAction,
@@ -2032,9 +2044,9 @@ Examples:
             "ast_chunk_size": int(args.ast_chunk_size),
             "ast_chunk_overlap": int(args.ast_chunk_overlap),
             "ast_fallback_traditional": bool(args.ast_fallback_traditional),
-            "graph_degree": int(args.graph_degree),
-            "complexity": int(args.complexity),
-            "num_threads": int(args.num_threads),
+            "graph_degree": args.graph_degree,
+            "complexity": args.complexity,
+            "num_threads": args.num_threads,
             "compact": bool(args.compact),
             "recompute": bool(args.recompute),
         }
@@ -2186,6 +2198,16 @@ Examples:
         except Exception:
             return None
 
+    @staticmethod
+    def _backend_build_options(args) -> dict[str, Any]:
+        """--graph-degree/--complexity/--num-threads when given; otherwise each backend keeps
+        its own default."""
+        return {
+            key: value
+            for key in ("graph_degree", "complexity", "num_threads")
+            if (value := getattr(args, key)) is not None
+        }
+
     def _make_incremental_builder(self, args) -> "LeannBuilder":
         # For incremental updates, the existing index's scheme wins. Otherwise
         # IDs would mix schemes within one index, which breaks lookups.
@@ -2201,11 +2223,9 @@ Examples:
             embedding_model=args.embedding_model,
             embedding_mode=args.embedding_mode,
             embedding_options=self._build_embedding_options(args) or None,
-            graph_degree=args.graph_degree,
-            complexity=args.complexity,
+            **self._backend_build_options(args),
             is_compact=args.compact,
             is_recompute=args.recompute,
-            num_threads=args.num_threads,
             passage_id_scheme=scheme,
         )
 
@@ -2241,8 +2261,7 @@ Examples:
         offset_file = index_dir / "documents.leann.passages.idx"
         live_ids: set[str] | None = None
         if offset_file.exists():
-            with open(offset_file, "rb") as f:
-                live_ids = set(pickle.load(f).keys())
+            live_ids = set(load_offset_map(offset_file))
         chunk_ids_by_file = self._load_chunk_ids_by_file(passages_file, live_ids=live_ids)
         roots = self._load_sync_roots(index_dir)
         ids_to_remove: list[str] = []
@@ -2288,8 +2307,7 @@ Examples:
         offset_file = index_dir / "documents.leann.passages.idx"
         live_ids: set[str] | None = None
         if offset_file.exists():
-            with open(offset_file, "rb") as f:
-                live_ids = set(pickle.load(f).keys())
+            live_ids = set(load_offset_map(offset_file))
         chunk_ids_by_file = (
             self._load_chunk_ids_by_file(passages_file, live_ids=live_ids)
             if passages_file.exists()
@@ -2803,11 +2821,9 @@ Examples:
             embedding_model=args.embedding_model,
             embedding_mode=args.embedding_mode,
             embedding_options=self._build_embedding_options(args) or None,
-            graph_degree=args.graph_degree,
-            complexity=args.complexity,
+            **self._backend_build_options(args),
             is_compact=args.compact,
             is_recompute=args.recompute,
-            num_threads=args.num_threads,
             passage_id_scheme=getattr(args, "id_scheme", "sequential"),
         )
 
@@ -3477,7 +3493,7 @@ Examples:
             for record in records:
                 cfg = record.get("config_signature", {})
                 print(
-                    f"- pid={record.get('pid')} port={record.get('port')} backend={record.get('backend_module_name')} model={cfg.get('model_name')}"
+                    f"- pid={record.get('pid')} port={record.get('port')} backend={record.get('backend_module_name')} model={cfg.get('model_name')} log={record.get('log_path')}"
                 )
             return
 

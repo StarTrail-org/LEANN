@@ -175,6 +175,23 @@ class MerkleTree:
         return added, removed, modified
 
 
+class _SnapshotUnpickler(pickle.Unpickler):
+    _ALLOWED = {
+        ("leann.sync", "MerkleTree"),
+        ("leann.sync", "MerkleTreeNode"),
+    }
+
+    def find_class(self, module: str, name: str):
+        if (module, name) in self._ALLOWED:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(
+            f"Global object {module}.{name} is not allowed in a sync snapshot"
+        )
+
+    def persistent_load(self, pid):
+        raise pickle.UnpicklingError("Persistent references are not allowed in a sync snapshot")
+
+
 class FileSynchronizer:
     def __init__(
         self,
@@ -298,7 +315,10 @@ class FileSynchronizer:
     def load_snapshot(self):
         try:
             with open(self.snapshot_path, "rb") as f:
-                self.tree = pickle.load(f)
+                tree = _SnapshotUnpickler(f).load()
+            if not isinstance(tree, MerkleTree):
+                raise pickle.UnpicklingError("Sync snapshot must contain a MerkleTree")
+            self.tree = tree
         except FileNotFoundError:
             self.tree = None
         except (
