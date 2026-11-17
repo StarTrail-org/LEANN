@@ -89,6 +89,14 @@ fixes). Newest entries at the bottom.
 - `create_text_chunks(max_tokens_per_chunk=...)` now only shrinks `chunk_size`; it previously replaced it, growing 256-token chunks to ~1700 for unknown models.
 - Existing indexes are unchanged; rebuild with `--force` to re-chunk with the new sizes.
 
+## 2026-10-22: Harden passage offset loading
+
+- Restricted passage offset-map unpickling to the primitive dictionary shape LEANN writes.
+- Rejected crafted `.passages.idx` files before a searcher or incremental update can continue.
+- Added regression coverage for the searcher entry point, primitive compatibility, and malformed input.
+- Restricted sync snapshots and embeddings pickles to their expected object graphs.
+- Loaded FlashLib IVF state dictionaries with PyTorch's safe weights-only loader.
+
 ## 2026-10-23: Refuse to load a custom encoder as a vanilla BertModel
 
 - `jinaai/jina-embeddings-v2-base-code` (and any encoder that declares its
@@ -128,3 +136,16 @@ fixes). Newest entries at the bottom.
 - Added `benchmarks/ocr_benchmark/`, which scores OCR with olmOCR's own tests, the way
   olmOCR's `benchmark.py` does. On a sample of 50 PDFs, MinerU 4.0.12 scored 85.5% with
   the `advanced` tier, 82.5% with `standard`, 73.2% with `basic`, and 64.8% with `flash`.
+
+## 2026-11-03: Embedding daemons no longer hold the caller's stdout/stderr
+
+- A daemon started through `LeannSearcher`, `LeannChat` or `leann daemon start` inherited the
+  stdio of the process that started it. Anything waiting for EOF on those pipes, such as
+  `python app.py | tee out.log` or `subprocess.run(capture_output=True)`, blocked until the idle
+  TTL expired (900 s by default) even though the program had already finished.
+- Daemons now run in their own session with stdin closed and write to
+  `~/.leann/servers/<registry key>.log`, truncated at each launch. `leann daemon status` prints the
+  path, and the error raised when a daemon fails to start includes the end of that log.
+- Servers started with `use_daemon=False` still share the caller's stdio.
+- `_pid_is_alive` uses `psutil.pid_exists`. `os.kill(pid, 0)` is not an existence check on Windows,
+  where signal 0 is `CTRL_C_EVENT`.

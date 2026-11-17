@@ -111,7 +111,7 @@ def _load_index(path: Path, device: str = "cuda"):
     import torch
 
     IvfFlatIndex, _, _ = _import_flashlib()
-    state = torch.load(str(path), map_location=device, weights_only=False)
+    state = torch.load(str(path), map_location=device, weights_only=True)
     kwargs: dict[str, Any] = {f: state[f].to(device) for f in _TENSOR_FIELDS}
     for f in _SCALAR_FIELDS:
         kwargs[f] = state[f]

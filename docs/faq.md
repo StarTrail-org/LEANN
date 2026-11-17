@@ -76,3 +76,25 @@ UV_LINK_MODE=copy uv tool install --reinstall leann-core --with leann
 ```
 
 `--reinstall` matters: without it uv leaves the already-hardlinked packages in place (satisfied requirements are skipped, and `uv tool install` refuses to overwrite an existing tool), so the error persists. pip installs are unaffected (pip copies by default).
+
+## 6. `leann build` fails with `Resource 'stopwords' not found` after `NLTK will not read data from ...` warnings (Linux)
+
+The same hardened nltk loader also refuses data directories that other accounts could write to. llama-index keeps its nltk data inside the environment (`site-packages/llama_index/core/_static/nltk_cache`), so an environment created under a group-writable umask (`umask 002`, the default on many Linux distributions) or inside a group-writable directory trips it when documents are chunked:
+
+```text
+RuntimeWarning: NLTK will not read data from '.../site-packages/llama_index/core/_static/nltk_cache':
+it is writable by, or owned by, another account, so a planted or rewritten file would be loaded as
+trusted data. Make it private to its owner (chmod go-w).
+[nltk_data] Refusing to install into '.../site-packages/llama_index/core/_static/nltk_cache': ...
+LookupError:
+  Resource 'stopwords' not found.
+```
+
+**Fix:** point llama-index at a private nltk data directory. It downloads `stopwords` and `punkt_tab` there on the first build (network needed once):
+
+```bash
+mkdir -m 700 -p ~/.cache/nltk_data
+export NLTK_DATA=~/.cache/nltk_data   # add to your shell profile
+```
+
+Unlike the hardlink case above, `UV_LINK_MODE=copy` does not help here: the copied directory is still group-writable.
