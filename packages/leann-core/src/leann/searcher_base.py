@@ -262,7 +262,10 @@ class BaseSearcher(LeannBackendSearcherInterface, ABC):
             provider_options=search_provider_options,
         )
         if not server_started:
-            raise RuntimeError(f"Failed to start embedding server on port {actual_port}")
+            # Raised rather than logged: the CLI points fd 2 at /dev/null during a search.
+            message = f"Failed to start embedding server on port {actual_port}"
+            output = self.embedding_server_manager.daemon_startup_output()
+            raise RuntimeError(f"{message}\n{output}" if output else message)
 
         # Remember port so the reusable ZMQ client can reconnect only when needed.
         # Do not connect here — the server may still be warming; connect on first send.
