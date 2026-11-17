@@ -35,7 +35,7 @@ BASELINE = "baseline"
 class BenchTest(Protocol):
     """One olmOCR-Bench test, as loaded by olmocr.bench.tests."""
 
-    def run(self, content: str) -> tuple[bool, str]:
+    def run(self, content: str, /) -> tuple[bool, str]:
         """Return whether the OCR text passes, and the reason when it fails."""
         ...
 
@@ -208,7 +208,7 @@ def summarize(
 
 def parse_args(tiers: Sequence[str]) -> argparse.Namespace:
     """Parse the command line, offering the given MinerU tiers for --tier."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Score LEANN's PDF OCR path on olmOCR-Bench.")
     parser.add_argument("--splits", nargs="+", choices=ALL_SPLITS, default=DEFAULT_SPLITS)
     parser.add_argument("--tier", choices=tiers, default="standard")
     parser.add_argument(
