@@ -567,7 +567,14 @@ class WeChatHistoryReader(BaseReader):
         if not isinstance(content, str):
             return ""
         clean_content = re.sub(r"^wxid_[^:]+:\s*", "", content)
-        clean_content = re.sub(r"^[^:]+:\s*", "", clean_content)
+        # NOTE: do not strip a generic "^word:" prefix here. The exporter
+        # (packages/wechat-exporter) writes raw message text into `content`
+        # with no "DisplayName:" prefix ever added, and sender attribution
+        # already comes from message metadata (isSentFromSelf / contact file
+        # name) in load_data. Treating any leading "word:" as a sender
+        # prefix mutilates ordinary bodies ("Reminder: buy milk" ->
+        # "buy milk", "10:30 meeting" -> "30 meeting") and can empty a
+        # message entirely ("Note:" -> ""), dropping it from the index.
         if clean_content.strip().startswith("<") or "recalled a message" in clean_content:
             return ""
         return clean_content.strip()
@@ -584,7 +591,8 @@ class WeChatHistoryReader(BaseReader):
         if "recalled a message" in content:
             return False
         clean_content = re.sub(r"^wxid_[^:]+:\s*", "", content)
-        clean_content = re.sub(r"^[^:]+:\s*", "", clean_content)
+        # NOTE: see _extract_readable_text — no generic "^word:" strip here
+        # either; it would empty messages like "Note:" and drop them.
         return len(clean_content.strip()) > 0 and not clean_content.strip().startswith("<")
 
     def load_data(

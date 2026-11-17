@@ -43,7 +43,7 @@ def estimate_token_count(text: str) -> int:
         import tiktoken
 
         encoder = tiktoken.get_encoding("cl100k_base")
-        return len(encoder.encode(text))
+        return len(encoder.encode(text, disallowed_special=()))
     except ImportError:
         # Fallback: Conservative character-based estimation
         # Assume worst case for code: 1.2 tokens per character
@@ -105,7 +105,7 @@ def validate_chunk_token_limits(chunks: list[str], max_tokens: int = 512) -> tup
                 import tiktoken
 
                 encoder = tiktoken.get_encoding("cl100k_base")
-                tokens = encoder.encode(chunk)
+                tokens = encoder.encode(chunk, disallowed_special=())
                 if len(tokens) > max_tokens:
                     truncated_tokens = tokens[:max_tokens]
                     truncated_chunk = encoder.decode(truncated_tokens)
