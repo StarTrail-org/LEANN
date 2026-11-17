@@ -89,6 +89,14 @@ fixes). Newest entries at the bottom.
 - `create_text_chunks(max_tokens_per_chunk=...)` now only shrinks `chunk_size`; it previously replaced it, growing 256-token chunks to ~1700 for unknown models.
 - Existing indexes are unchanged; rebuild with `--force` to re-chunk with the new sizes.
 
+## 2026-10-22: Harden passage offset loading
+
+- Restricted passage offset-map unpickling to the primitive dictionary shape LEANN writes.
+- Rejected crafted `.passages.idx` files before a searcher or incremental update can continue.
+- Added regression coverage for the searcher entry point, primitive compatibility, and malformed input.
+- Restricted sync snapshots and embeddings pickles to their expected object graphs.
+- Loaded FlashLib IVF state dictionaries with PyTorch's safe weights-only loader.
+
 ## 2026-10-23: Refuse to load a custom encoder as a vanilla BertModel
 
 - `jinaai/jina-embeddings-v2-base-code` (and any encoder that declares its
