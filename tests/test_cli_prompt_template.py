@@ -10,7 +10,16 @@ These tests verify that:
 
 from unittest.mock import Mock, patch
 
+import pytest
 from leann.cli import LeannCLI
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cwd(tmp_path, monkeypatch):
+    """`leann build` writes indexes under ./.leann; keep them out of the checkout."""
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
 
 
 class TestCLIPromptTemplateArgument:
