@@ -149,12 +149,10 @@ class OcrPDFReader(BaseReader):
         auto_detect_scanned: bool = False,
         tier: OcrTier = "standard",
     ):
+        # Fail before any file is read: forced OCR skips the text layer, so without
+        # MinerU every PDF would come out empty.
         if use_ocr and not OCR_AVAILABLE:
-            raise ValueError(
-                "Forced OCR requires MinerU, which is not installed. It skips "
-                "text extraction entirely, so every PDF would contribute no "
-                f"text at all. Install it with: {OCR_INSTALL_HINT}"
-            )
+            raise ImportError(f"Forced OCR requires MinerU. Install it with: {OCR_INSTALL_HINT}")
         self.use_ocr = use_ocr
         self.auto_detect_scanned = auto_detect_scanned
         self.tier = tier
@@ -332,7 +330,13 @@ class DocumentRAG(BaseRAGExample):
             reader_kwargs["required_exts"] = args.file_types
 
         # Add custom extractors if we need OCR
-        file_extractor = build_file_extractor(use_ocr_for_all, auto_detect_scanned, args.ocr_tier)
+        try:
+            file_extractor = build_file_extractor(
+                use_ocr_for_all, auto_detect_scanned, args.ocr_tier
+            )
+        except ImportError as e:
+            # Show the install command, not a traceback.
+            sys.exit(str(e))
         if file_extractor:
             reader_kwargs["file_extractor"] = file_extractor
 
