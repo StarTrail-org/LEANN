@@ -118,6 +118,8 @@ uv pip install leann
 # CPU-only (Linux): use the `cpu` extra (e.g. `leann[cpu]`)
 ```
 
+> **macOS note:** prebuilt wheels require **macOS 15 or later** on Apple Silicon (`macosx_15_0_arm64`), and macOS 15 or later on Intel. Releases after `0.3.9` no longer ship a `macosx_14_0_arm64` wheel, because GitHub retired the macOS 14 runner and the replacement runner's system libraries (`libomp`, `libzmq`, `libsodium`) carry a 15.0 minimum, so a 14.0-tagged wheel cannot honestly be produced. On macOS 14, either pin the last release that ships one, `uv pip install 'leann==0.3.9'`, or build from source (below). `0.3.9` has `macosx_14_0_arm64` wheels for Python 3.10 through 3.14.
+
 > **Linux note:** if a later `leann build` fails with `Security Violation [pathsec.open]: refusing multiply-linked file`, reinstall with `UV_LINK_MODE=copy uv pip install --reinstall ...` (or `UV_LINK_MODE=copy uv tool install --reinstall ...`) - uv's default hardlink installs trip nltk's hardened file loader bundled with llama-index. If it instead fails with `Resource 'stopwords' not found` after `NLTK will not read data from ...` warnings, the environment is group-writable: `export NLTK_DATA=` a private directory (`mkdir -m 700`). Details in the [FAQ](docs/faq.md).
 
 <!--

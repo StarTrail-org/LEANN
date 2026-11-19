@@ -238,5 +238,31 @@ Triage pass over the open PR queue. Entries for merges that did not carry their 
 `Build macos-14 Python 3.10`-`3.14` is cancelled on every pull request, because GitHub has
 retired the `macos-14` runner image. The jobs are cancelled rather than failed — three of
 them one second after starting — so `gh pr checks` reports them as failures on PRs whose
-code is fine. macos-14 last passed on 3 November (#460). `build-reusable.yml:99-107` still
-requests it; the matrix needs to drop macos-14 or move to a supported image.
+code is fine. macos-14 last passed on 3 November (#460). Resolved below on 2026-11-19;
+moving the target to another runner turned out not to be possible, so the runner was
+dropped and the wheel floor moved with it.
+
+## 2026-11-19: Prebuilt macOS wheels now require macOS 15 (breaking)
+
+- **Releases after `0.3.9` do not ship a `macosx_14_0_arm64` wheel.** The prebuilt Apple
+  Silicon floor is macOS 15. On macOS 14, pin `leann==0.3.9` — which does ship that wheel for
+  Python 3.10 through 3.14 — or build from source.
+- Why: GitHub retired the `macos-14` runner image, so those five build jobs stopped being
+  scheduled. They were *cancelled* rather than failed, which `gh pr checks` reports as a
+  failure, so every pull request showed five red jobs whose code was fine.
+- Why the target could not simply move to another runner: a 14.0 deployment target is not
+  reachable from a `macos-15` runner, because the Homebrew bottles installed there carry a
+  15.0 minimum themselves. `delocate` refuses the wheel rather than mislabel it:
+
+  ```
+  DelocationError: Library dependencies do not satisfy target MacOS version 14.0:
+    libomp.dylib has a minimum target of 15.0
+    libzmq.5.dylib has a minimum target of 15.0
+    libsodium.26.dylib has a minimum target of 15.0
+  ```
+
+  This is the same constraint the matrix already recorded for `macos-15-intel` ("system
+  libraries require it"). Preserving the 14.0 floor would mean building those three
+  dependencies from source on every macOS job.
+- Coverage is otherwise unchanged: `macos-15` and `macos-26` for Apple Silicon,
+  `macos-15-intel` for x86_64. The build matrix goes from 32 jobs to 27.
