@@ -125,6 +125,13 @@ fixes). Newest entries at the bottom.
   `batch_run_selected.py`, which was already on the current contract, and
   records `agent_seconds` and `latency_seconds` in each result row.
 
+## 2026-11-01: OCR for scanned pages and images
+
+- `apps/document_rag.py` now finds image-only pages inside PDFs that also have a text
+  layer, and OCRs just those pages. Before, those PDFs skipped OCR and lost the pages.
+- Added `--ocr-tier`, and OCR for `.png`, `.jpg`, and `.jpeg` files.
+- Files with no text are now skipped and named, instead of being indexed as empty chunks.
+
 ## 2026-11-03: Embedding daemons no longer hold the caller's stdout/stderr
 
 - A daemon started through `LeannSearcher`, `LeannChat` or `leann daemon start` inherited the
