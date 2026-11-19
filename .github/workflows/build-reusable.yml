@@ -96,16 +96,12 @@ jobs:
             python: '3.13'
           - os: ubuntu-22.04-arm
             python: '3.14'
-          - os: macos-14
-            python: '3.10'
-          - os: macos-14
-            python: '3.11'
-          - os: macos-14
-            python: '3.12'
-          - os: macos-14
-            python: '3.13'
-          - os: macos-14
-            python: '3.14'
+          # macos-14 removed: GitHub retired the runner image. Its jobs were cancelled
+          # rather than scheduled, which `gh pr checks` reports as a failure on every PR.
+          # A 14.0 deployment target is not reachable from a macos-15 runner either --
+          # the Homebrew bottles there (libomp, libzmq, libsodium) have a 15.0 minimum, so
+          # delocate refuses to tag the wheel 14.0. The prebuilt arm64 floor is therefore
+          # macOS 15; macOS 14 users build from source or pin leann==0.3.9.
           - os: macos-15
             python: '3.10'
           - os: macos-15
@@ -391,8 +387,6 @@ jobs:
             # macos-15-intel runs macOS 15, so target 15.0 (system libraries require it)
             if [[ "${{ matrix.os }}" == "macos-15-intel" ]]; then
               export MACOSX_DEPLOYMENT_TARGET=15.0
-            elif [[ "${{ matrix.os }}" == macos-14* ]]; then
-              export MACOSX_DEPLOYMENT_TARGET=14.0
             elif [[ "${{ matrix.os }}" == macos-15* ]]; then
               export MACOSX_DEPLOYMENT_TARGET=15.0
             elif [[ "${{ matrix.os }}" == macos-26* ]]; then
@@ -414,8 +408,6 @@ jobs:
             # macos-15-intel runs macOS 15, so target 15.0 (system libraries require it)
             if [[ "${{ matrix.os }}" == "macos-15-intel" ]]; then
               export MACOSX_DEPLOYMENT_TARGET=15.0
-            elif [[ "${{ matrix.os }}" == macos-14* ]]; then
-              export MACOSX_DEPLOYMENT_TARGET=14.0
             elif [[ "${{ matrix.os }}" == macos-15* ]]; then
               export MACOSX_DEPLOYMENT_TARGET=15.0
             elif [[ "${{ matrix.os }}" == macos-26* ]]; then
@@ -476,9 +468,6 @@ jobs:
           if [[ "${{ matrix.os }}" == "macos-15-intel" ]]; then
             HNSW_TARGET="15.0"
             DISKANN_TARGET="15.0"
-          elif [[ "${{ matrix.os }}" == macos-14* ]]; then
-            HNSW_TARGET="14.0"
-            DISKANN_TARGET="14.0"
           elif [[ "${{ matrix.os }}" == macos-15* ]]; then
             HNSW_TARGET="15.0"
             DISKANN_TARGET="15.0"
@@ -605,8 +594,6 @@ jobs:
             # macos-15-intel runs macOS 15, so target 15.0 (system libraries require it)
             if [[ "${{ matrix.os }}" == "macos-15-intel" ]]; then
               export MACOSX_DEPLOYMENT_TARGET=15.0
-            elif [[ "${{ matrix.os }}" == macos-14* ]]; then
-              export MACOSX_DEPLOYMENT_TARGET=14.0
             elif [[ "${{ matrix.os }}" == macos-15* ]]; then
               export MACOSX_DEPLOYMENT_TARGET=15.0
             elif [[ "${{ matrix.os }}" == macos-26* ]]; then
