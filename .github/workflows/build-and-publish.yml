@@ -7,6 +7,19 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Supersede in-flight runs for the same ref instead of queueing behind them. This
+# workflow fans out to a build matrix of ~30 jobs, about half of them macOS, so
+# without this a few pushes in a row each reserve a full matrix and later runs sit
+# queued behind work nobody wants any more -- on 2026-11-19 six runs piled up and
+# nothing cancelled the obsolete ones; a PR waited over an hour to start.
+# Safe to cancel: this workflow only builds (it calls build-reusable.yml, whose
+# jobs are lint, type-check, build and arch-smoke, and which uploads artifacts but
+# never publishes). Releases go through release-manual.yml, a separate workflow
+# with its own run, so they are not affected by this group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     uses: ./.github/workflows/build-reusable.yml
