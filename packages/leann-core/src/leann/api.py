@@ -1149,17 +1149,36 @@ class LeannBuilder:
         passage_meta_mode = meta.get("embedding_mode", self.embedding_mode)
         passage_provider_options = meta.get("embedding_options", self.embedding_options)
 
-        base_id = index.ntotal
-        for offset, chunk in enumerate(valid_chunks):
-            new_id = str(base_id + offset)
+        # New vectors get graph labels ntotal, ntotal + 1, ... The searcher and the embedding
+        # server map a label to its passage ID through ids.txt and use str(label) past its
+        # end. build_index() numbers chunks before it drops empty ones, so str(label) can
+        # already be another passage's ID. Give each new vector a free ID and record the
+        # label -> ID map for every label in ids.txt.
+        idmap_file = index_dir / f"{index_prefix}.ids.txt"
+        known_ids = (
+            idmap_file.read_text(encoding="utf-8").splitlines() if idmap_file.exists() else []
+        )
+        label_ids = [
+            known_ids[label] if label < len(known_ids) else str(label)
+            for label in range(index.ntotal)
+        ]
+        taken_ids = set(offset_map) | set(label_ids)
+        next_id = index.ntotal
+        for chunk in valid_chunks:
+            while str(next_id) in taken_ids:
+                next_id += 1
+            new_id = str(next_id)
+            next_id += 1
             chunk.setdefault("metadata", {})["id"] = new_id
             chunk["id"] = new_id
+            label_ids.append(new_id)
 
         # Append passages/offsets before we attempt index.add so the ZMQ server
         # can resolve newly assigned IDs during recompute. Keep rollback hooks
         # so we can restore files if the update fails mid-way.
         rollback_passages_size = passages_file.stat().st_size if passages_file.exists() else 0
         offset_map_backup = offset_map.copy()
+        idmap_backup = idmap_file.read_bytes() if idmap_file.exists() else None
 
         try:
             with open(passages_file, "a", encoding="utf-8") as f:
@@ -1179,6 +1198,8 @@ class LeannBuilder:
 
             with open(offset_file, "wb") as f:
                 pickle.dump(offset_map, f)
+            with open(idmap_file, "w", encoding="utf-8") as f:
+                f.writelines(f"{passage_id}\n" for passage_id in label_ids)
 
             server_manager: Optional[EmbeddingServerManager] = None
             server_started = False
@@ -1234,6 +1255,10 @@ class LeannBuilder:
             offset_map = offset_map_backup
             with open(offset_file, "wb") as f:
                 pickle.dump(offset_map, f)
+            if idmap_backup is None:
+                idmap_file.unlink(missing_ok=True)
+            else:
+                idmap_file.write_bytes(idmap_backup)
             raise
 
         meta["total_passages"] = len(offset_map)
