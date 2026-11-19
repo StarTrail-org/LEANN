@@ -156,3 +156,77 @@ fixes). Newest entries at the bottom.
   now only taken when it is non-empty: a 33-character text layer went from 0
   documents to 1.
 - Both are from the OCR work merged in #190, in the half #440 did not cover.
+
+## 2026-11-17: Cosine recompute, HNSW build options, and four silent-corruption fixes
+
+Triage pass over the open PR queue. Entries for merges that did not carry their own.
+
+- **Cosine HNSW indexes ranked recompute results by raw inner product (#449).** `cosine`
+  is implemented as `faiss.METRIC_INNER_PRODUCT` (`hnsw_backend.py:28`), so correctness
+  depends on every vector being unit length. `HNSWBuilder` normalized at build time and
+  `HNSWSearcher` normalized the query, but the embedding server scored recomputed passages
+  with their raw embeddings, so long vectors beat close ones. Recall@10 on 3,000 BEIR
+  Natural Questions passages with `facebook/contriever` (whose passage norms span ~1.1-2.2)
+  went from 0.480 to 0.990; stored-vector search was unaffected at 0.987. Only models that
+  do not L2-normalize their own output were affected; the default `mips` metric was not.
+- **`--graph-degree`, `--complexity` and `--num-threads` did nothing on the HNSW backend
+  (#450).** `leann build` passed the backend-neutral names but `HNSWBuilder` read only
+  `M`/`efConstruction`, so `--graph-degree 8` still built an M=32 graph. Two behavior
+  changes follow from the flags now being honored: the bundled apps pass
+  `--build-complexity 64` (`apps/base_rag_example.py:267`), so app-built HNSW indexes now
+  use efConstruction=64 instead of the 200 they silently got, and `leann watch` replay of a
+  pre-existing index rebuilds at that index's saved defaults. Graph construction also now
+  uses all cores on Linux instead of inheriting the `OMP_NUM_THREADS=1` that `__init__.py`
+  sets for the recompute/ZMQ hang in #208 — construction makes no ZMQ calls, and the thread
+  count is restored in a `finally` so later searches keep the guard. 100k x 768-d build on
+  an i9-13900K: 125.9s to 21.4s.
+- **AST chunking segfaulted on a fresh install (#453).** py-tree-sitter 0.26.0 returns
+  borrowed references from `Point.row`/`Point.column`, corrupting memory once astchunk walks
+  a large enough file. `tree-sitter` is now `>=0.20.0,!=0.26.0` rather than `<0.26`, so the
+  fixed release is allowed in; 0.26.1 has since shipped. `uv sync` users were never exposed
+  because `uv.lock` pins 0.25.1; the pin covers `uv pip install -e "."` as in the AST
+  chunking guide, and the next `uv lock --upgrade`.
+- **A literal `<|endoftext|>` in a document crashed chunking (#461).** tiktoken's `encode()`
+  defaults to `disallowed_special="all"` and raises `ValueError` on such text, and both call
+  sites in `chunking_utils.py` caught only `ImportError`, so the error propagated out of
+  `estimate_token_count` and `validate_chunk_token_limits`. Any corpus quoting a chat
+  template or tokenizer documentation failed to index. Both paths now pass
+  `disallowed_special=()` so the spelling is counted as ordinary text.
+- **`WeChatHistoryReader` truncated any message containing a colon (#465, fixes #464).** A
+  broad `^[^:]+:\s*` strip, applied after the legitimate `wxid_<id>:` sender strip, treated
+  any leading `word:` as a sender prefix: "Reminder: buy milk tomorrow" indexed as "buy milk
+  tomorrow" and "10:30 meeting at noon" as "30 meeting at noon". Worse, "Note:" became the
+  empty string, so `_is_text_message` returned `False` and the message was dropped from the
+  index entirely. The broad strip was also redundant — the specific `wxid_` strip already
+  handles the one format it was written for.
+- **The Anthropic factory default was a retired model (#454).** `get_llm({"type":
+  "anthropic"})` with no `model` built `claude-3-5-sonnet-20241022`, so the first question
+  with the Anthropic provider and no explicit model returned a 404, while `AnthropicChat`'s
+  own signature default had already moved to `claude-haiku-4-5`. The factory's duplicate
+  default was removed rather than synced, leaving the class signature as the only place the
+  default is named. Note for a follow-up: `claude-haiku-4-5` is now previous-generation —
+  `claude-haiku-5-5` has a 1M context against 200K and costs $0.10/$0.50 per MTok against
+  $1.00/$5.00. The bump is a pure string change here, because the Anthropic request is built
+  with only `model`, `messages`, `max_tokens` and an optional `temperature`.
+- **Opt-in Outcrawl web document reader (#458).** Search-and-scrape reader under
+  `apps/outcrawl_data/` plus `apps/outcrawl_rag.py` and `docs/outcrawl.md`, following the
+  layout of the Parallel MCP reader (#433). Self-contained: no core, dependency or existing
+  app changes. A page that fails to scrape keeps its search snippet rather than disappearing.
+- **Test and docs hygiene.** `tests/test_cli_prompt_template.py` now runs each test in its
+  own temporary working directory (#451) — `LeannCLI.__init__` does
+  `Path.cwd() / ".leann" / "indexes"` and `mkdir`s it, so the suite left
+  `.leann/indexes/test-index` in the checkout and every later local run failed five tests.
+  `tests/test_document_rag.py` reads subprocess output as UTF-8 (#460), which on Windows
+  cp1252 had made `result.stdout + result.stderr` raise. FAQ §6 documents the nltk failure
+  in group-writable environments (#452): llama-index keeps its nltk data inside the
+  environment at `site-packages/llama_index/core/_static/nltk_cache`, which nltk's hardened
+  loader refuses under `umask 002`; `UV_LINK_MODE=copy` does not help because the copy is
+  still group-writable, so point `NLTK_DATA` at a private directory.
+
+### Known CI issue
+
+`Build macos-14 Python 3.10`-`3.14` is cancelled on every pull request, because GitHub has
+retired the `macos-14` runner image. The jobs are cancelled rather than failed — three of
+them one second after starting — so `gh pr checks` reports them as failures on PRs whose
+code is fine. macos-14 last passed on 3 November (#460). `build-reusable.yml:99-107` still
+requests it; the matrix needs to drop macos-14 or move to a supported image.
