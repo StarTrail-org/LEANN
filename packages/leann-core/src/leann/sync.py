@@ -4,7 +4,7 @@ import pickle
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,7 @@ def _iter_directory_files(
     root_dir: str,
     include_extensions: list[str],
     include_hidden: bool,
+    exclude: Optional[Callable[[Path], bool]] = None,
 ) -> list[str]:
     root = Path(root_dir).resolve()
     if not root.is_dir():
@@ -114,6 +115,8 @@ def _iter_directory_files(
             if not include_hidden and _path_has_hidden_segment(rel):
                 continue
             if not _extension_allowed(file_path, include_extensions):
+                continue
+            if exclude is not None and exclude(file_path):
                 continue
             if file_path.is_file():
                 paths.append(str(file_path))
@@ -202,6 +205,7 @@ class FileSynchronizer:
         include_hidden: bool = False,
         auto_load=True,
         snapshot_path: Optional[str] = None,
+        exclude: Optional[Callable[[Path], bool]] = None,
     ):
         self.root_dir = str(Path(root_dir).resolve()) if root_dir else None
         self.explicit_files = (
@@ -215,6 +219,8 @@ class FileSynchronizer:
         self.ignore_patterns = ignore_patterns
         self.include_extensions = include_extensions or list(DEFAULT_INDEX_EXTENSIONS)
         self.include_hidden = include_hidden
+        # Files under root_dir for which this returns True are not tracked (explicit files are).
+        self.exclude = exclude
         self._custom_snapshot_path = snapshot_path
         self._pending_tree: Optional[MerkleTree] = None
         self.tree: Optional[MerkleTree] = None
@@ -229,6 +235,7 @@ class FileSynchronizer:
                     self.root_dir,
                     self.include_extensions,
                     self.include_hidden,
+                    self.exclude,
                 )
             )
         for file_path in self.explicit_files:

@@ -985,7 +985,7 @@ Examples:
         """Register current project directory in global registry"""
         register_project_directory()
 
-    def _build_gitignore_parser(self, docs_dir: str):
+    def _build_gitignore_parser(self, docs_dir: str, announce: bool = True):
         """Build gitignore parser using gitignore-parser library."""
         from gitignore_parser import parse_gitignore
 
@@ -996,11 +996,12 @@ Examples:
             try:
                 # gitignore-parser automatically handles all subdirectory .gitignore files!
                 matches = parse_gitignore(str(gitignore_path))
-                print(f"📋 Loaded .gitignore from {docs_dir} (includes all subdirectories)")
+                if announce:
+                    print(f"📋 Loaded .gitignore from {docs_dir} (includes all subdirectories)")
                 return matches
             except Exception as e:
                 print(f"Warning: Could not parse .gitignore: {e}")
-        else:
+        elif announce:
             print("📋 No .gitignore found")
 
         # Fallback: basic pattern matching for essential files
@@ -2089,12 +2090,19 @@ Examples:
         for root in directories:
             tag = hashlib.sha256(root.encode()).hexdigest()[:12]
             snapshot_path = str(index_dir / f"sync_{tag}.pickle")
+            # Track only what a directory scan in load_documents() would load: a file that
+            # .gitignore excludes must not reach the index through an incremental update,
+            # and editing .gitignore must show up as files added or removed.
+            gitignore_matches = self._build_gitignore_parser(root, announce=False)
             try:
                 fs = FileSynchronizer(
                     root_dir=root,
                     include_extensions=include_extensions,
                     include_hidden=include_hidden,
                     snapshot_path=snapshot_path,
+                    exclude=lambda path, matches=gitignore_matches: self._should_exclude_file(
+                        path, matches
+                    ),
                 )
                 synchronizers.append(fs)
             except Exception as exc:

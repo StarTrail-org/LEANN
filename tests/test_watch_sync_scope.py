@@ -1,5 +1,7 @@
 """Regression tests for leann watch sync scope (#345)."""
 
+from pathlib import Path
+
 from leann.cli import LeannCLI
 from leann.sync import FileSynchronizer
 
@@ -81,3 +83,45 @@ def test_mixed_txt_and_bin_directory_skips_bin_without_crash(tmp_path):
     )
     added, removed, modified = fs2.detect_changes()
     assert not added and not removed and not modified
+
+
+def _docs_with_gitignore(tmp_path):
+    docs = tmp_path / "docs"
+    (docs / "build").mkdir(parents=True)
+    (docs / ".gitignore").write_text("secret.txt\nbuild/\n", encoding="utf-8")
+    (docs / "notes.md").write_text("Project notes about glaciers.", encoding="utf-8")
+    (docs / "secret.txt").write_text("API token list, do not index.", encoding="utf-8")
+    (docs / "build" / "out.md").write_text("Generated build output.", encoding="utf-8")
+    return docs
+
+
+def test_build_sync_tracks_what_the_directory_scan_loads(tmp_path):
+    """Files that .gitignore excludes from a full build must not enter the snapshot either.
+
+    Otherwise a new or edited ignored file is reported as a change and loaded by name, and
+    files named on --docs skip .gitignore, so the incremental update indexes it.
+    """
+    docs = _docs_with_gitignore(tmp_path)
+    cli = LeannCLI()
+
+    scanned = {chunk["metadata"]["file_path"] for chunk in cli.load_documents([str(docs)])}
+    [fs] = cli._build_synchronizers([str(docs)], tmp_path / "index")
+
+    assert set(fs.generate_file_hashes()) == {str(Path(p).resolve()) for p in scanned}
+    assert set(fs.generate_file_hashes()) == {str((docs / "notes.md").resolve())}
+
+
+def test_gitignore_edits_show_up_as_added_and_removed_files(tmp_path):
+    docs = _docs_with_gitignore(tmp_path)
+    (tmp_path / "index").mkdir()
+    cli = LeannCLI()
+    [fs] = cli._build_synchronizers([str(docs)], tmp_path / "index")
+    fs.create_snapshot()
+
+    (docs / ".gitignore").write_text("build/\nnotes.md\n", encoding="utf-8")
+    [fs] = cli._build_synchronizers([str(docs)], tmp_path / "index")
+    added, removed, modified = fs.detect_changes()
+
+    assert added == [str((docs / "secret.txt").resolve())]
+    assert removed == [str((docs / "notes.md").resolve())]
+    assert modified == []
