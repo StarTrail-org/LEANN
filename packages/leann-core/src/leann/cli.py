@@ -2754,8 +2754,9 @@ Examples:
                     include_hidden=args.include_hidden,
                     args=args,
                 )
-                # Proceed even when all_texts is empty (e.g. file emptied): we still need to remove old chunks
-                if not all_texts and not (can_ivf_update and (modified_paths or removed_paths)):
+                # Proceed even when all_texts is empty (e.g. files were only deleted): old chunks
+                # still have to go, through the IVF update or the full rebuild below.
+                if not all_texts and not (modified_paths or removed_paths):
                     print("No documents found")
                     return
 
