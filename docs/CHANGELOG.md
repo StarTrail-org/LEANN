@@ -266,3 +266,13 @@ dropped and the wheel floor moved with it.
   dependencies from source on every macOS job.
 - Coverage is otherwise unchanged: `macos-15` and `macos-26` for Apple Silicon,
   `macos-15-intel` for x86_64. The build matrix goes from 32 jobs to 27.
+
+## 2026-11-20: Deleting files no longer leaves them searchable in HNSW indexes
+
+- HNSW cannot delete vectors in place, so `leann build` falls back to a full rebuild when
+  files are modified or removed. When the only changes were deletions, the incremental path
+  loaded the changed files, got no text back, and returned with "No documents found" before
+  reaching that fallback. The sync snapshot was not committed either, so every later run
+  printed the same message, and the deleted files' chunks stayed in the index until
+  another file was added or modified, or `--force` was used. The early return now applies
+  only when nothing was modified or removed; IVF still removes the chunks in place.

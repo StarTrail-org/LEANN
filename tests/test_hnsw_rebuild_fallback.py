@@ -109,3 +109,67 @@ def test_hnsw_modify_triggers_full_rebuild_that_reloads_untouched_files(tmp_path
         "full-rebuild fallback dropped an untouched file from the corpus (issue #386)"
     )
     assert "modified content" in added_texts
+
+
+def test_hnsw_remove_only_triggers_full_rebuild(tmp_path, monkeypatch):
+    """A deleted file leaves nothing to load from the changed paths.
+
+    That must not stop the full rebuild, or the deleted file stays searchable.
+    """
+    monkeypatch.chdir(tmp_path)
+    docs_root = tmp_path / "docs"
+    docs_root.mkdir()
+    keep_file = docs_root / "keep.md"
+    keep_file.write_text("keep me around", encoding="utf-8")
+    gone_path = str((docs_root / "gone.md").resolve())  # indexed earlier, now deleted
+
+    cli = LeannCLI()
+    index_dir = tmp_path / ".leann" / "indexes" / "sample"
+    index_dir.mkdir(parents=True)
+    (index_dir / "documents.leann.meta.json").write_text(
+        json.dumps(
+            {
+                "backend_name": "hnsw",
+                "embedding_model": "facebook/contriever",
+                "embedding_mode": "sentence-transformers",
+                "backend_kwargs": {"is_compact": False, "is_recompute": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeSynchronizer:
+        def detect_changes(self):
+            return set(), {gone_path}, set()
+
+        def create_snapshot(self):
+            pass
+
+    def fake_load_documents(paths, _file_types, include_hidden=False, args=None):
+        if list(paths) == [str(docs_root)]:
+            return [{"text": "keep me around", "metadata": {"file_path": str(keep_file)}}]
+        return []  # nothing left to load from the deleted path
+
+    added_texts: list[str] = []
+
+    class RecordingBuilder:
+        def __init__(self, **_kwargs):
+            pass
+
+        def add_text(self, text, metadata=None):
+            added_texts.append(text)
+
+        def build_index(self, index_path):
+            Path(index_path).parent.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(cli, "_build_synchronizers", lambda *_a, **_k: [FakeSynchronizer()])
+    monkeypatch.setattr(cli, "load_documents", fake_load_documents)
+    monkeypatch.setattr(cli, "register_project_dir", lambda: None)
+    monkeypatch.setattr("leann.cli.LeannBuilder", RecordingBuilder)
+
+    args = cli.create_parser().parse_args(
+        ["build", "sample", "--docs", str(docs_root), "--backend-name", "hnsw"]
+    )
+    asyncio.run(cli.build_index(args))
+
+    assert added_texts == ["keep me around"]
