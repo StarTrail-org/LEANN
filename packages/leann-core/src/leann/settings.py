@@ -24,6 +24,12 @@ def _clean_url(value: str) -> str:
     return value.rstrip("/") if value else value
 
 
+def _ensure_scheme(value: str) -> str:
+    """Prepend http:// when a host has no scheme (Ollama's OLLAMA_HOST is often host:port)."""
+
+    return value if "://" in value else f"http://{value}"
+
+
 def resolve_ollama_host(explicit: str | None = None) -> str:
     """Resolve the Ollama-compatible endpoint to use."""
 
@@ -37,7 +43,7 @@ def resolve_ollama_host(explicit: str | None = None) -> str:
 
     for candidate in candidates:
         if candidate:
-            return _clean_url(candidate)
+            return _clean_url(_ensure_scheme(candidate))
 
     return _clean_url(_DEFAULT_OLLAMA_HOST)
 
