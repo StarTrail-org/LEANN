@@ -273,7 +273,7 @@ def handle_status(request_id, args):
         return _make_result(request_id, f"Index '{index_name}' not found at {leann_dir}")
 
     try:
-        with open(meta_path) as f:
+        with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
     except Exception as e:
         return _make_result(request_id, f"Error reading index metadata: {e}")
@@ -282,7 +282,7 @@ def handle_status(request_id, args):
     num_chunks = 0
     file_paths = set()
     if passages_path.exists():
-        with open(passages_path) as f:
+        with open(passages_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
