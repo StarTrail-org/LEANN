@@ -929,8 +929,12 @@ class AnthropicChat(LLMInterface):
 
             response = self.client.messages.create(**params)
 
-            # Extract text from response
-            response_text = response.content[0].text
+            # Extract text from response. Models with thinking enabled return
+            # non-text blocks (e.g. "thinking") before the text, so join only
+            # the text blocks instead of reading content[0].
+            response_text = "".join(
+                block.text for block in response.content if getattr(block, "type", None) == "text"
+            )
 
             # Log token usage
             print(
