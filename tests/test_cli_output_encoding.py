@@ -1,10 +1,10 @@
 """The CLI must write UTF-8 when its output is piped, whatever the locale.
 
 Before Python 3.15, Windows encodes piped stdout with the ANSI code page (cp1252 on
-English systems). The CLI prints emoji and passage text, so ``leann build``,
-``leann list`` and ``leann search --json`` raised UnicodeEncodeError whenever their
-output was captured, which is how the MCP server runs them. PYTHONIOENCODING=cp1252
-reproduces that code page on any platform.
+English systems). When their output was captured, which is how the MCP server runs
+them, ``leann build`` and ``leann list`` raised UnicodeEncodeError at their first emoji,
+and ``leann search`` did the same on passage text outside the code page.
+PYTHONIOENCODING=cp1252 reproduces that code page on any platform.
 """
 
 import json

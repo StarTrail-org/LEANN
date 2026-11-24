@@ -289,14 +289,15 @@ dropped and the wheel floor moved with it.
 - Nothing that worked before stops working: an index named `documents` resolves the same
   file as before, and a genuinely missing passages file still raises the same error.
 
-## 2026-11-25: The CLI and MCP tools work on Windows when output is piped
+## 2026-11-25: The CLI writes UTF-8, so the MCP tools work on Windows
 
 - Before Python 3.15, Windows encodes piped or redirected output with the ANSI code page
-  (cp1252 on English systems), which has no emoji and no CJK characters. The CLI prints
-  both, so `leann build` and `leann list` raised `UnicodeEncodeError` at their first emoji,
-  and `leann search` did the same on passage text outside the code page. The MCP server
-  runs the CLI through a pipe, so `leann_build` and `leann_list` failed on every call, and
-  `leann_search` failed whenever a result held such text. #391 made the MCP server decode
-  the output as UTF-8, but the CLI was still writing it in the code page.
-- `leann.cli.main` now switches stdout and stderr to UTF-8, which also fixes
-  `leann ... > out.log` and `| tee`. Console output is unchanged.
+  (cp1252 on English systems). When the CLI's output was captured, `leann build` and
+  `leann list` raised `UnicodeEncodeError` at their first emoji, and `leann search` did
+  the same on passage text outside the code page. The MCP server runs the CLI through a
+  pipe, so `leann_build` and `leann_list` failed on every call there.
+- Text inside the code page was written in it, and the MCP server decodes the output as
+  UTF-8 (#391) with replacement, so `leann_search` returned "crème brûlée" as
+  "cr�me br�l�e" without an error.
+- `leann.cli.main` now writes stdout and stderr as UTF-8 on every platform, including when
+  `PYTHONIOENCODING` names another codec. Output to a console is unchanged.
