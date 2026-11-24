@@ -1412,7 +1412,10 @@ class LeannSearcher:
         # Use PassageManager length (sum of shard sizes) to avoid
         # depending on a massive combined map
         total_docs = len(self.passage_manager)
-        original_top_k = top_k
+        # A widened re-search (below) passes the caller's real top_k down so the
+        # target stays fixed while the candidate pool grows.
+        requested_top_k = kwargs.pop("_requested_top_k", None)
+        original_top_k = top_k if requested_top_k is None else requested_top_k
         if top_k > total_docs:
             top_k = total_docs
             logger.warning(
@@ -1457,7 +1460,6 @@ class LeannSearcher:
                     daemon_ttl_seconds=self._daemon_ttl_seconds,
                     **kwargs,
                 )
-                del expected_zmq_port
             zmq_time = time.time() - start_time
             logger.info(f"  Launching server time: {zmq_time} seconds")
 
@@ -1577,9 +1579,35 @@ class LeannSearcher:
         # Apply metadata filters if specified
         if metadata_filters:
             logger.info(f"  🔍 Applying metadata filters: {metadata_filters}")
+            fetched = len(enriched_results)
             enriched_results = self.passage_manager.filter_search_results(
                 enriched_results, metadata_filters
             )
+            # Filters run after the backend search, so asking the backend for only
+            # top_k candidates leaves fewer than top_k (often zero) matches whenever
+            # the best-ranked passages fail the filter. Widen the candidate pool
+            # until top_k passages match or every passage has been considered.
+            if len(enriched_results) < original_top_k and fetched >= top_k and top_k < total_docs:
+                logger.info(
+                    f"  Only {len(enriched_results)} of {original_top_k} results matched "
+                    f"the filters among the top {top_k}; widening the candidate pool"
+                )
+                return self.search(
+                    query,
+                    top_k=min(total_docs, top_k * 4),
+                    complexity=complexity,
+                    beam_width=beam_width,
+                    prune_ratio=prune_ratio,
+                    recompute_embeddings=recompute_embeddings,
+                    pruning_strategy=pruning_strategy,
+                    expected_zmq_port=expected_zmq_port,
+                    metadata_filters=metadata_filters,
+                    batch_size=batch_size,
+                    vector_weight=vector_weight,
+                    provider_options=provider_options,
+                    _requested_top_k=original_top_k,
+                    **kwargs,
+                )[:original_top_k]
 
         # Define color codes outside the loop for final message
         GREEN = "\033[92m"
