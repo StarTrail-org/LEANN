@@ -56,6 +56,13 @@ def _build_text_file_extractor() -> dict[str, FallbackTextReader]:
     }
 
 
+class _CaseInsensitiveExtensions(frozenset):
+    """SimpleDirectoryReader tests `path.suffix in required_exts` with the suffix as spelled."""
+
+    def __contains__(self, suffix: object) -> bool:
+        return isinstance(suffix, str) and super().__contains__(suffix.lower())
+
+
 # Plain-text extensions read through FallbackTextReader so Latin-1 /
 # Windows-1252 files keep their accented characters (issue #483).
 TEXT_FILE_EXTRACTOR = _build_text_file_extractor()
@@ -1747,13 +1754,7 @@ Examples:
                 print(f"❌ Error processing individual files: {e}")
 
         # Define file extensions to process
-        if custom_file_types:
-            # Parse custom file types from comma-separated string
-            code_extensions = [ext.strip() for ext in custom_file_types.split(",") if ext.strip()]
-            # Ensure extensions start with a dot
-            code_extensions = [ext if ext.startswith(".") else f".{ext}" for ext in code_extensions]
-        else:
-            code_extensions = list(DEFAULT_INDEX_EXTENSIONS)
+        code_extensions = parse_include_extensions(custom_file_types)
 
         # Process each directory
         if directories:
@@ -1772,10 +1773,12 @@ Examples:
             docs_path = Path(docs_dir).resolve()
 
             # Check if we should process PDFs
-            should_process_pdfs = custom_file_types is None or ".pdf" in custom_file_types
+            should_process_pdfs = ".pdf" in code_extensions
 
             if should_process_pdfs:
-                for file_path in docs_path.rglob("*.pdf"):
+                for file_path in docs_path.rglob("*"):
+                    if file_path.suffix.lower() != ".pdf":
+                        continue
                     # Check if file matches any exclude pattern
                     try:
                         # Ensure both paths are resolved before computing relativity
@@ -1849,7 +1852,7 @@ Examples:
                         docs_dir,
                         recursive=True,
                         encoding="utf-8",
-                        required_exts=other_file_extensions,
+                        required_exts=_CaseInsensitiveExtensions(other_file_extensions),
                         file_extractor=TEXT_FILE_EXTRACTOR,
                         exclude_hidden=not include_hidden,
                         filename_as_id=True,

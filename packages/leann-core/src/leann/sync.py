@@ -71,7 +71,7 @@ def parse_include_extensions(custom_file_types: Optional[str]) -> list[str]:
     """Return the extension allowlist used for sync/watch (matches build defaults)."""
     if not custom_file_types:
         return list(DEFAULT_INDEX_EXTENSIONS)
-    extensions = [ext.strip() for ext in custom_file_types.split(",") if ext.strip()]
+    extensions = [ext.strip().lower() for ext in custom_file_types.split(",") if ext.strip()]
     return [ext if ext.startswith(".") else f".{ext}" for ext in extensions]
 
 
