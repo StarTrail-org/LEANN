@@ -276,3 +276,15 @@ dropped and the wheel floor moved with it.
   printed the same message, and the deleted files' chunks stayed in the index until
   another file was added or modified, or `--force` was used. The early return now applies
   only when nothing was modified or removed; IVF still removes the chunks in place.
+
+## 2026-11-25: The CLI and MCP tools work on Windows when output is piped
+
+- Before Python 3.15, Windows encodes piped or redirected output with the ANSI code page
+  (cp1252 on English systems), which has no emoji and no CJK characters. The CLI prints
+  both, so `leann build` and `leann list` raised `UnicodeEncodeError` at their first emoji,
+  and `leann search` did the same on passage text outside the code page. The MCP server
+  runs the CLI through a pipe, so `leann_build` and `leann_list` failed on every call, and
+  `leann_search` failed whenever a result held such text. #391 made the MCP server decode
+  the output as UTF-8, but the CLI was still writing it in the code page.
+- `leann.cli.main` now switches stdout and stderr to UTF-8, which also fixes
+  `leann ... > out.log` and `| tee`. Console output is unchanged.
