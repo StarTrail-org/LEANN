@@ -123,7 +123,9 @@ class IVFBuilder(LeannBackendBuilderInterface):
         quantizer = (
             faiss.IndexFlatL2(dim) if metric_enum == faiss.METRIC_L2 else faiss.IndexFlatIP(dim)
         )
-        ivf = faiss.IndexIVFFlat(quantizer, dim, self.nlist, metric_enum)
+        # k-means needs at least one vector per list, and a small folder can chunk into
+        # fewer passages than the default 100 lists.
+        ivf = faiss.IndexIVFFlat(quantizer, dim, min(self.nlist, n), metric_enum)
         ivf.train(data)
         ivf.set_direct_map_type(faiss.DirectMap.Hashtable)
         faiss_ids = np.arange(n, dtype=np.int64)

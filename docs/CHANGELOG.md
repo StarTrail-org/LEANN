@@ -276,3 +276,13 @@ dropped and the wheel floor moved with it.
   printed the same message, and the deleted files' chunks stayed in the index until
   another file was added or modified, or `--force` was used. The early return now applies
   only when nothing was modified or removed; IVF still removes the chunks in place.
+
+## 2026-11-25: IVF indexes build from folders with fewer than 100 chunks
+
+- IVF clusters vectors into `nlist` lists with k-means (100 by default), and FAISS
+  refuses to train on fewer vectors than lists. A folder that chunked into fewer than
+  100 passages failed with "Number of training points (2) should be at least as large
+  as number of clusters (100)". The MCP `leann_build` tool defaults to IVF, so it
+  failed on any small folder.
+- The IVF builder now uses at most one list per vector. Larger corpora are unchanged,
+  and incremental adds and removes keep working on a small index.
