@@ -44,3 +44,25 @@ class TestAnthropicDefaultModel:
 
         assert isinstance(llm, AnthropicChat)
         assert llm.model == "claude-sonnet-5-5"
+
+
+class TestAnthropicAskThinkingBlock:
+    @patch("anthropic.Anthropic")
+    def test_ask_skips_leading_thinking_block(self, mock_anthropic_cls):
+        from types import SimpleNamespace
+
+        from leann.chat import AnthropicChat
+
+        response = SimpleNamespace(
+            content=[
+                SimpleNamespace(type="thinking", thinking="let me think"),
+                SimpleNamespace(type="text", text=" the answer "),
+            ],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=2),
+            stop_reason="end_turn",
+        )
+        mock_anthropic_cls.return_value.messages.create.return_value = response
+
+        llm = AnthropicChat(model="claude-sonnet-5-5", api_key="test-key")
+
+        assert llm.ask("hi") == "the answer"
