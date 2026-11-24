@@ -276,3 +276,11 @@ dropped and the wheel floor moved with it.
   printed the same message, and the deleted files' chunks stayed in the index until
   another file was added or modified, or `--force` was used. The early return now applies
   only when nothing was modified or removed; IVF still removes the chunks in place.
+
+## 2026-11-24: `leann rebuild` and `leann watch` work for indexes built from files
+
+- `leann build --docs a.md b.md` records individual files under `files` in `sync_roots.json`
+  and leaves `roots` (directories) empty. `leann rebuild` only looked at `roots`, so it
+  refused with "sync config has no document roots", and `leann watch` reported the changes
+  but never rebuilt the index, without a message. Both now use the recorded directories
+  and files.
