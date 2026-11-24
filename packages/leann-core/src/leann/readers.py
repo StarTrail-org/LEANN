@@ -695,3 +695,39 @@ class ClaudeReader(BaseReader):
 
     def load_data(self, export_path: str) -> list[Document]:
         return []
+
+
+class FallbackTextReader(BaseReader):
+    """Plain-text reader that preserves accented characters in non-UTF-8 files.
+
+    llama-index's ``SimpleDirectoryReader`` decodes plain-text files with
+    ``errors="ignore"``, so bytes that are not valid UTF-8 are silently
+    dropped ("crème brûlée" becomes "crme brle", see issue #483). This
+    reader instead tries UTF-8 first, falls back to Windows-1252 (cp1252)
+    — the encoding most Latin-1-era editors actually wrote — and finally
+    to UTF-8 with replacement characters, so it never raises on
+    undecodable bytes and never silently loses text.
+    """
+
+    def load_data(
+        self, file_path: str | Path, extra_info: dict | None = None, **kwargs: Any
+    ) -> list[Document]:
+        path = Path(file_path)
+        raw = path.read_bytes()
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text = raw.decode("cp1252")
+            except UnicodeDecodeError:
+                print(
+                    f"⚠️  {path} is not valid UTF-8 or Windows-1252; "
+                    "reading as UTF-8 with replacement characters."
+                )
+                text = raw.decode("utf-8", errors="replace")
+            else:
+                print(
+                    f"⚠️  {path} is not valid UTF-8; reading as Windows-1252 "
+                    "(cp1252) so accented characters are preserved."
+                )
+        return [Document(text=text, metadata=dict(extra_info or {}))]

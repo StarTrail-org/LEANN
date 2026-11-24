@@ -1149,17 +1149,36 @@ class LeannBuilder:
         passage_meta_mode = meta.get("embedding_mode", self.embedding_mode)
         passage_provider_options = meta.get("embedding_options", self.embedding_options)
 
-        base_id = index.ntotal
-        for offset, chunk in enumerate(valid_chunks):
-            new_id = str(base_id + offset)
+        # New vectors get graph labels ntotal, ntotal + 1, ... The searcher and the embedding
+        # server map a label to its passage ID through ids.txt and use str(label) past its
+        # end. build_index() numbers chunks before it drops empty ones, so str(label) can
+        # already be another passage's ID. Give each new vector a free ID and record the
+        # label -> ID map for every label in ids.txt.
+        idmap_file = index_dir / f"{index_prefix}.ids.txt"
+        known_ids = (
+            idmap_file.read_text(encoding="utf-8").splitlines() if idmap_file.exists() else []
+        )
+        label_ids = [
+            known_ids[label] if label < len(known_ids) else str(label)
+            for label in range(index.ntotal)
+        ]
+        taken_ids = set(offset_map) | set(label_ids)
+        next_id = index.ntotal
+        for chunk in valid_chunks:
+            while str(next_id) in taken_ids:
+                next_id += 1
+            new_id = str(next_id)
+            next_id += 1
             chunk.setdefault("metadata", {})["id"] = new_id
             chunk["id"] = new_id
+            label_ids.append(new_id)
 
         # Append passages/offsets before we attempt index.add so the ZMQ server
         # can resolve newly assigned IDs during recompute. Keep rollback hooks
         # so we can restore files if the update fails mid-way.
         rollback_passages_size = passages_file.stat().st_size if passages_file.exists() else 0
         offset_map_backup = offset_map.copy()
+        idmap_backup = idmap_file.read_bytes() if idmap_file.exists() else None
 
         try:
             with open(passages_file, "a", encoding="utf-8") as f:
@@ -1179,6 +1198,8 @@ class LeannBuilder:
 
             with open(offset_file, "wb") as f:
                 pickle.dump(offset_map, f)
+            with open(idmap_file, "w", encoding="utf-8") as f:
+                f.writelines(f"{passage_id}\n" for passage_id in label_ids)
 
             server_manager: Optional[EmbeddingServerManager] = None
             server_started = False
@@ -1234,6 +1255,10 @@ class LeannBuilder:
             offset_map = offset_map_backup
             with open(offset_file, "wb") as f:
                 pickle.dump(offset_map, f)
+            if idmap_backup is None:
+                idmap_file.unlink(missing_ok=True)
+            else:
+                idmap_file.write_bytes(idmap_backup)
             raise
 
         meta["total_passages"] = len(offset_map)
@@ -1412,7 +1437,10 @@ class LeannSearcher:
         # Use PassageManager length (sum of shard sizes) to avoid
         # depending on a massive combined map
         total_docs = len(self.passage_manager)
-        original_top_k = top_k
+        # A widened re-search (below) passes the caller's real top_k down so the
+        # target stays fixed while the candidate pool grows.
+        requested_top_k = kwargs.pop("_requested_top_k", None)
+        original_top_k = top_k if requested_top_k is None else requested_top_k
         if top_k > total_docs:
             top_k = total_docs
             logger.warning(
@@ -1457,7 +1485,6 @@ class LeannSearcher:
                     daemon_ttl_seconds=self._daemon_ttl_seconds,
                     **kwargs,
                 )
-                del expected_zmq_port
             zmq_time = time.time() - start_time
             logger.info(f"  Launching server time: {zmq_time} seconds")
 
@@ -1577,9 +1604,35 @@ class LeannSearcher:
         # Apply metadata filters if specified
         if metadata_filters:
             logger.info(f"  🔍 Applying metadata filters: {metadata_filters}")
+            fetched = len(enriched_results)
             enriched_results = self.passage_manager.filter_search_results(
                 enriched_results, metadata_filters
             )
+            # Filters run after the backend search, so asking the backend for only
+            # top_k candidates leaves fewer than top_k (often zero) matches whenever
+            # the best-ranked passages fail the filter. Widen the candidate pool
+            # until top_k passages match or every passage has been considered.
+            if len(enriched_results) < original_top_k and fetched >= top_k and top_k < total_docs:
+                logger.info(
+                    f"  Only {len(enriched_results)} of {original_top_k} results matched "
+                    f"the filters among the top {top_k}; widening the candidate pool"
+                )
+                return self.search(
+                    query,
+                    top_k=min(total_docs, top_k * 4),
+                    complexity=complexity,
+                    beam_width=beam_width,
+                    prune_ratio=prune_ratio,
+                    recompute_embeddings=recompute_embeddings,
+                    pruning_strategy=pruning_strategy,
+                    expected_zmq_port=expected_zmq_port,
+                    metadata_filters=metadata_filters,
+                    batch_size=batch_size,
+                    vector_weight=vector_weight,
+                    provider_options=provider_options,
+                    _requested_top_k=original_top_k,
+                    **kwargs,
+                )[:original_top_k]
 
         # Define color codes outside the loop for final message
         GREEN = "\033[92m"
@@ -1681,57 +1734,58 @@ class LeannSearcher:
             raise RuntimeError("BM25 scorer failed to initialize")
         return scorer.search(query, top_k)
 
-    def _find_jsonl_file(self) -> Optional[str]:
-        """Find the .jsonl file containing raw passages for grep search"""
-        index_path = Path(self.meta_path_str).parent
-        potential_files = [
-            index_path / "documents.leann.passages.jsonl",
-            index_path.parent / "documents.leann.passages.jsonl",
-        ]
-
-        for file_path in potential_files:
-            if file_path.exists():
-                return str(file_path)
-        return None
+    def _passage_jsonl_files(self) -> list[str]:
+        """Return the passage JSONL shards that exist on disk."""
+        # PassageManager resolves these from the index metadata; a recorded shard
+        # may have no JSONL on disk.
+        shards: list[str] = []
+        for passage_file in self.passage_manager.passage_files.values():
+            if Path(passage_file).exists():
+                shards.append(passage_file)
+            else:
+                logger.warning(f"Passage file missing: {passage_file}")
+        return shards
 
     def _grep_search(self, query: str, top_k: int = 5) -> list[SearchResult]:
         """Perform grep-based search on raw passages"""
-        jsonl_file = self._find_jsonl_file()
-        if not jsonl_file:
+        jsonl_files = self._passage_jsonl_files()
+        if not jsonl_files:
             raise FileNotFoundError("No .jsonl passages file found for grep search")
 
+        matches = []
         try:
-            cmd = ["grep", "-i", "-n", query, jsonl_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            for jsonl_file in jsonl_files:
+                # grep prefixes "file:line:" across files, so grep each shard separately.
+                cmd = ["grep", "-i", "-n", query, jsonl_file]
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
-            if result.returncode == 1:
-                return []
-            elif result.returncode != 0:
-                raise RuntimeError(f"Grep failed: {result.stderr}")
-
-            matches = []
-            for line in result.stdout.strip().split("\n"):
-                if not line:
+                if result.returncode == 1:
                     continue
-                parts = line.split(":", 1)
-                if len(parts) != 2:
-                    continue
+                elif result.returncode != 0:
+                    raise RuntimeError(f"Grep failed: {result.stderr}")
 
-                try:
-                    data = json.loads(parts[1])
-                    text = data.get("text", "")
-                    score = text.lower().count(query.lower())
+                for line in result.stdout.strip().split("\n"):
+                    if not line:
+                        continue
+                    parts = line.split(":", 1)
+                    if len(parts) != 2:
+                        continue
 
-                    matches.append(
-                        SearchResult(
-                            id=data.get("id", parts[0]),
-                            text=text,
-                            metadata=data.get("metadata", {}),
-                            score=float(score),
+                    try:
+                        data = json.loads(parts[1])
+                        text = data.get("text", "")
+                        score = text.lower().count(query.lower())
+
+                        matches.append(
+                            SearchResult(
+                                id=data.get("id", parts[0]),
+                                text=text,
+                                metadata=data.get("metadata", {}),
+                                score=float(score),
+                            )
                         )
-                    )
-                except json.JSONDecodeError:
-                    continue
+                    except json.JSONDecodeError:
+                        continue
 
             matches.sort(key=lambda x: x.score, reverse=True)
             return matches[:top_k]

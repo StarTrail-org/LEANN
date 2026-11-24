@@ -268,7 +268,7 @@ def chunk_book_with_metadata(book_text, book_info):
 
 ### Efficient Filtering Strategies
 
-1. **Post-search filtering**: Applies filters after vector search, which should be efficient for typical result sets (10-100 results).
+1. **Post-search filtering**: Applies filters to the vector search results. If fewer than `top_k` of the first `top_k` candidates match, the search widens its candidate pool (4x each time) until `top_k` passages match or every passage has been considered, so a selective filter costs extra searches rather than returning too few results.
 
 2. **Metadata design**: Keep metadata fields simple and avoid deeply nested structures.
 
