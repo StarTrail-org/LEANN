@@ -1681,57 +1681,58 @@ class LeannSearcher:
             raise RuntimeError("BM25 scorer failed to initialize")
         return scorer.search(query, top_k)
 
-    def _find_jsonl_file(self) -> Optional[str]:
-        """Find the .jsonl file containing raw passages for grep search"""
-        index_path = Path(self.meta_path_str).parent
-        potential_files = [
-            index_path / "documents.leann.passages.jsonl",
-            index_path.parent / "documents.leann.passages.jsonl",
-        ]
-
-        for file_path in potential_files:
-            if file_path.exists():
-                return str(file_path)
-        return None
+    def _passage_jsonl_files(self) -> list[str]:
+        """Return the passage JSONL shards that exist on disk."""
+        # PassageManager resolves these from the index metadata; a recorded shard
+        # may have no JSONL on disk.
+        shards: list[str] = []
+        for passage_file in self.passage_manager.passage_files.values():
+            if Path(passage_file).exists():
+                shards.append(passage_file)
+            else:
+                logger.warning(f"Passage file missing: {passage_file}")
+        return shards
 
     def _grep_search(self, query: str, top_k: int = 5) -> list[SearchResult]:
         """Perform grep-based search on raw passages"""
-        jsonl_file = self._find_jsonl_file()
-        if not jsonl_file:
+        jsonl_files = self._passage_jsonl_files()
+        if not jsonl_files:
             raise FileNotFoundError("No .jsonl passages file found for grep search")
 
+        matches = []
         try:
-            cmd = ["grep", "-i", "-n", query, jsonl_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            for jsonl_file in jsonl_files:
+                # grep prefixes "file:line:" across files, so grep each shard separately.
+                cmd = ["grep", "-i", "-n", query, jsonl_file]
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
-            if result.returncode == 1:
-                return []
-            elif result.returncode != 0:
-                raise RuntimeError(f"Grep failed: {result.stderr}")
-
-            matches = []
-            for line in result.stdout.strip().split("\n"):
-                if not line:
+                if result.returncode == 1:
                     continue
-                parts = line.split(":", 1)
-                if len(parts) != 2:
-                    continue
+                elif result.returncode != 0:
+                    raise RuntimeError(f"Grep failed: {result.stderr}")
 
-                try:
-                    data = json.loads(parts[1])
-                    text = data.get("text", "")
-                    score = text.lower().count(query.lower())
+                for line in result.stdout.strip().split("\n"):
+                    if not line:
+                        continue
+                    parts = line.split(":", 1)
+                    if len(parts) != 2:
+                        continue
 
-                    matches.append(
-                        SearchResult(
-                            id=data.get("id", parts[0]),
-                            text=text,
-                            metadata=data.get("metadata", {}),
-                            score=float(score),
+                    try:
+                        data = json.loads(parts[1])
+                        text = data.get("text", "")
+                        score = text.lower().count(query.lower())
+
+                        matches.append(
+                            SearchResult(
+                                id=data.get("id", parts[0]),
+                                text=text,
+                                metadata=data.get("metadata", {}),
+                                score=float(score),
+                            )
                         )
-                    )
-                except json.JSONDecodeError:
-                    continue
+                    except json.JSONDecodeError:
+                        continue
 
             matches.sort(key=lambda x: x.score, reverse=True)
             return matches[:top_k]

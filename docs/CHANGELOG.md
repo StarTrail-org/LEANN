@@ -277,10 +277,14 @@ dropped and the wheel floor moved with it.
   another file was added or modified, or `--force` was used. The early return now applies
   only when nothing was modified or removed; IVF still removes the chunks in place.
 
-## 2026-11-24: `leann rebuild` and `leann watch` work for indexes built from files
+## 2026-11-24: Grep search finds the index's own passages
 
-- `leann build --docs a.md b.md` records individual files under `files` in `sync_roots.json`
-  and leaves `roots` (directories) empty. `leann rebuild` only looked at `roots`, so it
-  refused with "sync config has no document roots", and `leann watch` reported the changes
-  but never rebuilt the index, without a message. Both now use the recorded directories
-  and files.
+- `search(..., use_grep=True)` looked for a hardcoded `documents.leann.passages.jsonl`, so
+  it raised `FileNotFoundError: No .jsonl passages file found for grep search` for every
+  index named differently — including the repo's own `examples/grep_search_example.py`,
+  which opens `my-documents.leann`.
+- Grep search now reads the passage shards that `PassageManager` resolves from the index's
+  own `meta.json` `passage_sources`, and searches every declared shard instead of a single
+  hardcoded file, so multi-shard indexes no longer drop matches.
+- Nothing that worked before stops working: an index named `documents` resolves the same
+  file as before, and a genuinely missing passages file still raises the same error.
