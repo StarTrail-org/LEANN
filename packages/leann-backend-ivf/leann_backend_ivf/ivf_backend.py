@@ -113,6 +113,8 @@ class IVFBuilder(LeannBackendBuilderInterface):
         data = np.ascontiguousarray(data)
         dim = self.dimensions or data.shape[1]
         n = data.shape[0]
+        if n == 0:
+            raise ValueError("Cannot build an IVF index from zero vectors.")
         metric_enum = _get_metric_map().get(self.distance_metric.lower())
         if metric_enum is None:
             raise ValueError(f"Unsupported distance_metric '{self.distance_metric}'.")

@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import leann.api as api
 import numpy as np
+import pytest
 from leann.api import LeannBuilder
 from leann_backend_ivf.ivf_backend import IVFSearcher
 
@@ -34,3 +35,12 @@ def test_ivf_builds_and_searches_fewer_chunks_than_the_default_nlist(tmp_path):
 
     assert result["labels"][0][0] == "b"
     assert sorted(result["labels"][0]) == ["a", "b", "c"]
+
+
+def test_ivf_refuses_to_build_from_zero_vectors(tmp_path):
+    # With the list count capped at the number of vectors, zero vectors would give an
+    # index with no lists, which saves but can never be searched.
+    builder = LeannBuilder(backend_name="ivf", dimensions=2)
+
+    with pytest.raises(ValueError, match="zero vectors"):
+        builder.build_index_from_arrays(str(tmp_path / "empty.leann"), [], np.zeros((0, 2)))

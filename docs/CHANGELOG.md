@@ -291,10 +291,11 @@ dropped and the wheel floor moved with it.
 
 ## 2026-11-25: IVF indexes build from folders with fewer than 100 chunks
 
-- IVF clusters vectors into `nlist` lists with k-means (100 by default), and FAISS
-  refuses to train on fewer vectors than lists. A folder that chunked into fewer than
-  100 passages failed with "Number of training points (2) should be at least as large
-  as number of clusters (100)". The MCP `leann_build` tool defaults to IVF, so it
-  failed on any small folder.
-- The IVF builder now uses at most one list per vector. Larger corpora are unchanged,
-  and incremental adds and removes keep working on a small index.
+- IVF clusters vectors into `nlist` lists with k-means, and FAISS refuses to train on
+  fewer vectors than lists. With the default `nlist=100`, builds of 1 to 99 vectors failed
+  with "Number of training points (2) should be at least as large as number of clusters
+  (100)". The MCP `leann_build` tool defaults to IVF, so it failed on any folder that
+  chunked into fewer than 100 passages.
+- The IVF builder now uses at most one list per vector. Builds with at least `nlist`
+  vectors are unchanged. Building from zero vectors still fails, now with a `ValueError`
+  that says so.
