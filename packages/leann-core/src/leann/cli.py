@@ -21,6 +21,7 @@ from .api import Fts5BM25Index, LeannBuilder, LeannChat, LeannSearcher
 from .embedding_server_manager import EmbeddingServerManager
 from .index_offsets import load_offset_map
 from .interactive_utils import create_cli_session
+from .readers import FallbackTextReader
 from .registry import DEFAULT_INDEX_SCAN_DEPTH, iter_index_meta_files, register_project_directory
 from .settings import (
     resolve_anthropic_base_url,
@@ -35,6 +36,29 @@ from .settings import (
     resolve_openai_base_url,
 )
 from .sync import DEFAULT_INDEX_EXTENSIONS, FileSynchronizer, parse_include_extensions
+
+
+def _build_text_file_extractor() -> dict[str, FallbackTextReader]:
+    """Map plain-text extensions to a reader that preserves non-UTF-8 text.
+
+    llama-index ships dedicated readers for a few extensions (e.g. .pdf,
+    .docx, .pptx, .ipynb); those keep their default reader. Every other
+    extension in DEFAULT_INDEX_EXTENSIONS is plain text and would otherwise
+    go through SimpleDirectoryReader's standard read, which decodes with
+    errors="ignore" and silently drops undecodable bytes ("crème brûlée"
+    becomes "crme brle", issue #483). Deriving the already-covered set
+    from supported_suffix_fn() keeps this correct across llama-index
+    versions. file_extractor values must be reader instances, not classes.
+    """
+    covered = set(SimpleDirectoryReader.supported_suffix_fn())
+    return {
+        ext: FallbackTextReader() for ext in DEFAULT_INDEX_EXTENSIONS if ext.lower() not in covered
+    }
+
+
+# Plain-text extensions read through FallbackTextReader so Latin-1 /
+# Windows-1252 files keep their accented characters (issue #483).
+TEXT_FILE_EXTRACTOR = _build_text_file_extractor()
 
 
 def _non_negative_int(value: str) -> int:
@@ -1704,6 +1728,7 @@ Examples:
                         file_docs = SimpleDirectoryReader(
                             parent_dir,
                             input_files=file_list,
+                            file_extractor=TEXT_FILE_EXTRACTOR,
                             # exclude_hidden only affects directory scans; input_files are explicit
                             filename_as_id=True,
                         ).load_data()
@@ -1788,6 +1813,7 @@ Examples:
                             default_docs = SimpleDirectoryReader(
                                 str(file_path.parent),
                                 exclude_hidden=not include_hidden,
+                                file_extractor=TEXT_FILE_EXTRACTOR,
                                 filename_as_id=True,
                                 required_exts=[file_path.suffix],
                             ).load_data()
@@ -1823,7 +1849,7 @@ Examples:
                         recursive=True,
                         encoding="utf-8",
                         required_exts=other_file_extensions,
-                        file_extractor={},  # Use default extractors
+                        file_extractor=TEXT_FILE_EXTRACTOR,
                         exclude_hidden=not include_hidden,
                         filename_as_id=True,
                     ).load_data(show_progress=True)
@@ -2940,7 +2966,7 @@ Examples:
             return None
         with open(sync_config_path, encoding="utf-8") as f:
             config = json.load(f)
-        roots = config.get("roots") or []
+        roots = self._load_sync_roots(index_dir)
         if not roots:
             if verbose:
                 print(f"Cannot rebuild '{index_name}': sync config has no document roots.")

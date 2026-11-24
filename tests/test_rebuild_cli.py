@@ -151,6 +151,29 @@ def test_reconstruct_build_args_falls_back_to_metadata_and_sync_config(tmp_path,
     assert parsed.embedding_prompt_template == "passage: "
 
 
+def test_reconstruct_build_args_accepts_explicit_files_only(tmp_path, monkeypatch):
+    # `leann build --docs a.md b.md` records the files under "files" and leaves "roots" empty.
+    monkeypatch.chdir(tmp_path)
+    doc = tmp_path / "notes.md"
+    doc.write_text("note", encoding="utf-8")
+
+    cli = LeannCLI()
+    index_dir = tmp_path / ".leann" / "indexes" / "files-only"
+    index_dir.mkdir(parents=True)
+    (index_dir / "documents.leann.meta.json").write_text(
+        json.dumps({"backend_name": "hnsw"}), encoding="utf-8"
+    )
+    (index_dir / "sync_roots.json").write_text(
+        json.dumps({"directories": [], "files": [str(doc)], "roots": []}),
+        encoding="utf-8",
+    )
+
+    reconstructed = cli._reconstruct_build_args("files-only")
+
+    assert reconstructed is not None
+    assert cli.create_parser().parse_args(reconstructed).docs == [str(doc)]
+
+
 def test_successful_full_build_persists_rebuild_config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     docs_root = tmp_path / "docs"
