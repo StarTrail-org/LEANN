@@ -167,3 +167,33 @@ def test_a_non_compact_hnsw_index_appends_without_ids_too(tmp_path):
 
     assert _text_of(index, "3") == "d"
     assert _text_of(index, "4") == "e"
+
+
+def _texts_by_label(index, ntotal: int) -> list[str]:
+    """Resolve each graph label the way HNSWSearcher does: ids.txt, then str(label) past its end."""
+    ids = (index.parent / "docs.ids.txt").read_text(encoding="utf-8").splitlines()
+    return [
+        _text_of(index, ids[label] if label < len(ids) else str(label)) for label in range(ntotal)
+    ]
+
+
+@pytest.mark.skipif(
+    sys.platform == "darwin",
+    reason="On macOS runners the native ``index.add()`` call that ``update_index()`` makes "
+    "aborts inside the FAISS bindings, taking the whole pytest session with it.",
+)
+def test_hnsw_append_after_a_skipped_empty_chunk_keeps_every_passage(tmp_path):
+    """``build_index()`` numbers chunks before it drops empty ones, so IDs can outrun the graph.
+
+    Here the build keeps "a" as passage 0 and "c" as passage 2 in a two-vector graph. The append
+    used str(index.ntotal), "2", for "d": the offset map then sent passage 2 to "d", "c" could no
+    longer be found, and graph labels 1 and 2 both returned "d".
+    """
+    index = tmp_path / "docs.leann"
+    options = {"backend_name": "hnsw", "is_compact": False, "is_recompute": False}
+    _build(index, ["a", "", "c"], **options)
+
+    _append(index, "d", **options)
+
+    assert _text_of(index, "2") == "c"
+    assert _texts_by_label(index, 3) == ["a", "c", "d"]
