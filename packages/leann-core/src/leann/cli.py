@@ -2966,7 +2966,7 @@ Examples:
             return None
         with open(sync_config_path, encoding="utf-8") as f:
             config = json.load(f)
-        roots = config.get("roots") or []
+        roots = self._load_sync_roots(index_dir)
         if not roots:
             if verbose:
                 print(f"Cannot rebuild '{index_name}': sync config has no document roots.")
