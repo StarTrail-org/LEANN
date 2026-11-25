@@ -341,6 +341,7 @@ class BaseSearcher(LeannBackendSearcherInterface, ABC):
             self.embedding_model,
             embedding_mode,
             provider_options=self._search_provider_options(),
+            is_query=True,
         )
 
         # Cache the result (use original query before template)

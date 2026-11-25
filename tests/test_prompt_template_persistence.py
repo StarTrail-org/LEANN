@@ -618,7 +618,7 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         # Mock compute_embeddings to capture the query text
         captured_queries = []
 
-        def mock_compute_embeddings(texts, model, mode, provider_options=None):
+        def mock_compute_embeddings(texts, model, mode, provider_options=None, *, is_query=False):
             captured_queries.extend(texts)
             return np.random.rand(len(texts), 768).astype(np.float32)
 
@@ -742,7 +742,7 @@ class TestQueryTemplateApplicationInComputeEmbedding:
 
         captured_queries = []
 
-        def mock_compute_embeddings(texts, model, mode, provider_options=None):
+        def mock_compute_embeddings(texts, model, mode, provider_options=None, *, is_query=False):
             captured_queries.extend(texts)
             return np.random.rand(len(texts), 768).astype(np.float32)
 
@@ -803,7 +803,7 @@ class TestQueryTemplateApplicationInComputeEmbedding:
         # Capture queries from fallback path
         fallback_queries = []
 
-        def mock_compute_embeddings(texts, model, mode, provider_options=None):
+        def mock_compute_embeddings(texts, model, mode, provider_options=None, *, is_query=False):
             fallback_queries.extend(texts)
             return np.random.rand(len(texts), 768).astype(np.float32)
 
@@ -881,7 +881,7 @@ class TestQueryTemplateApplicationInComputeEmbedding:
 
         captured_queries = []
 
-        def mock_compute_embeddings(texts, model, mode, provider_options=None):
+        def mock_compute_embeddings(texts, model, mode, provider_options=None, *, is_query=False):
             captured_queries.extend(texts)
             return np.random.rand(len(texts), 768).astype(np.float32)
 

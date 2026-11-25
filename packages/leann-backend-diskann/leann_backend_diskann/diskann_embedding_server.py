@@ -212,6 +212,7 @@ def create_diskann_embedding_server(
                     model_name,
                     mode=embedding_mode,
                     provider_options=PROVIDER_OPTIONS,
+                    is_query=is_text_request,
                 )
                 logger.info(
                     f"Computed embeddings for {len(texts)} texts, shape: {embeddings.shape}"
@@ -333,6 +334,7 @@ def create_diskann_embedding_server(
                         model_name,
                         mode=embedding_mode,
                         provider_options=PROVIDER_OPTIONS,
+                        is_query=is_text_request,
                     )
                     logger.info(f"Computed embeddings shape: {embeddings.shape}")
 
