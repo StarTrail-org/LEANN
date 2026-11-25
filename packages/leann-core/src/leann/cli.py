@@ -4063,6 +4063,13 @@ def main():
 
     import dotenv
 
+    # Before Python 3.15, Windows encodes piped or redirected output with the ANSI
+    # code page (cp1252, GBK, ...), which can't hold the emoji the CLI prints or
+    # arbitrary passage text. The MCP server captures this output and reads it as UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors=stream.errors)
+
     dotenv.load_dotenv()
 
     # Set clean logging for CLI usage
