@@ -7,36 +7,55 @@ passages failed with
 "Number of training points (2) should be at least as large as number of clusters (100)".
 """
 
-from unittest.mock import patch
+import subprocess
+import sys
+import textwrap
 
-import leann.api as api
 import numpy as np
 import pytest
 from leann.api import LeannBuilder
-from leann_backend_ivf import ivf_backend
 
-VECTORS = {
-    text: np.random.default_rng(ord(text)).standard_normal(8).astype(np.float32) for text in "abc"
-}
+# Runs in a fresh interpreter. Once an HNSW wheel's FAISS bindings are loaded, which other
+# tests in the same pytest process do, FAISS objects that IVF reads back come through those
+# bindings and are unreliable, so this process must load only the IVF backend's FAISS.
+BUILD_AND_SEARCH = textwrap.dedent(
+    """
+    import sys
+    from unittest.mock import patch
 
+    import leann.api as api
+    import numpy as np
+    from leann.api import LeannBuilder
+    from leann_backend_ivf.ivf_backend import IVFSearcher
 
-def _embed(texts, *args, **kwargs):
-    return np.stack([VECTORS[text] for text in texts])
-
-
-def test_ivf_builds_from_fewer_chunks_than_the_default_nlist(tmp_path):
-    index = tmp_path / "small.leann"
-    with patch.object(api, "compute_embeddings", side_effect=_embed):
+    vectors = {
+        t: np.random.default_rng(ord(t)).standard_normal(8).astype(np.float32) for t in "abc"
+    }
+    embed = lambda texts, *args, **kwargs: np.stack([vectors[t] for t in texts])
+    with patch.object(api, "compute_embeddings", side_effect=embed):
         builder = LeannBuilder(backend_name="ivf", dimensions=8)
         for text in "abc":
             builder.add_text(text, metadata={"id": text})
-        builder.build_index(str(index))
+        builder.build_index(sys.argv[1])
 
-    # Read the saved index back instead of searching it: once an HNSW wheel's FAISS
-    # bindings are loaded in the same process, IVF search loses its NumPy wrapper.
-    faiss = ivf_backend.faiss
-    ivf = faiss.extract_index_ivf(faiss.read_index(str(tmp_path / "small.index")))
-    assert (ivf.ntotal, ivf.nlist) == (3, 3)
+    result = IVFSearcher(sys.argv[1]).search(vectors["b"][None, :], top_k=3)
+    print("LABELS=" + ",".join(result["labels"][0]))
+    """
+)
+
+
+def test_ivf_builds_and_searches_fewer_chunks_than_the_default_nlist(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-c", BUILD_AND_SEARCH, str(tmp_path / "small.leann")],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    assert result.returncode == 0, result.stderr
+    labels = result.stdout.split("LABELS=")[-1].split()[0].split(",")
+    assert labels[0] == "b"
+    assert sorted(labels) == ["a", "b", "c"]
 
 
 def test_ivf_refuses_to_build_from_zero_vectors(tmp_path):
