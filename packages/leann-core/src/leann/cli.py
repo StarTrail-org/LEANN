@@ -31,6 +31,8 @@ from .settings import (
     resolve_litellm_base_url,
     resolve_minimax_api_key,
     resolve_minimax_base_url,
+    resolve_novita_api_key,
+    resolve_novita_base_url,
     resolve_ollama_host,
     resolve_openai_api_key,
     resolve_openai_base_url,
@@ -3616,6 +3618,11 @@ Examples:
             resolved_api_key = resolve_minimax_api_key(args.api_key)
             if resolved_api_key:
                 llm_config["api_key"] = resolved_api_key
+        elif args.llm == "novita":
+            llm_config["base_url"] = resolve_novita_base_url(args.api_base)
+            resolved_api_key = resolve_novita_api_key(args.api_key)
+            if resolved_api_key:
+                llm_config["api_key"] = resolved_api_key
         elif args.llm in {"atlascloud", "atlas-cloud", "atlas"}:
             llm_config["type"] = "atlascloud"
             if args.model == "qwen3:8b":
@@ -3918,6 +3925,11 @@ Examples:
         elif args.llm == "minimax":
             llm_config["base_url"] = resolve_minimax_base_url(args.api_base)
             resolved_api_key = resolve_minimax_api_key(args.api_key)
+            if resolved_api_key:
+                llm_config["api_key"] = resolved_api_key
+        elif args.llm == "novita":
+            llm_config["base_url"] = resolve_novita_base_url(args.api_base)
+            resolved_api_key = resolve_novita_api_key(args.api_key)
             if resolved_api_key:
                 llm_config["api_key"] = resolved_api_key
         elif args.llm in {"atlascloud", "atlas-cloud", "atlas"}:
