@@ -288,3 +288,29 @@ dropped and the wheel floor moved with it.
   hardcoded file, so multi-shard indexes no longer drop matches.
 - Nothing that worked before stops working: an index named `documents` resolves the same
   file as before, and a genuinely missing passages file still raises the same error.
+
+## 2026-11-26: Deleting every indexed file now removes the index
+
+- The 2026-11-20 fix covered the delta path, but the same "No documents found" guard still
+  existed in the full rebuild that HNSW falls back to when files are only deleted. When every
+  indexed file had been removed, the rebuild loaded nothing, printed "No documents found", and
+  returned with the old index intact and the sync snapshot uncommitted, so `leann search` kept
+  returning the deleted passages and every later build repeated the message.
+- The rebuild now asks the synchronizers what they currently track and reads the corpus
+  definition the index was built from (the `--file-types` and `--include-hidden` scope recorded
+  in the index's sync roots). If the index exists, the build compared a previous snapshot against
+  a corpus it actually observed, and nothing is tracked anymore under that same corpus
+  definition, the whole corpus was deleted: the index directory is removed (the same one
+  `leann remove` deletes), the empty state is committed so the next build starts clean, and the
+  command says so explicitly.
+- An empty tracked set is only treated as a deletion when this build runs with the same corpus
+  definition the index was built from. A build that never observed the corpus — a `--docs` path
+  that does not exist, or a directory the index has no snapshot for — never deletes anything; a
+  `--file-types` or `--include-hidden` value that matches nothing empties the tracked set while
+  every indexed file is still on disk and keeps the index, and an index with no recorded corpus
+  definition is kept too. All of these report "No documents found". Files that still exist but
+  yield no text keep the previous behaviour — "No documents found" with the index untouched,
+  since the index is still valid. A file that merely cannot be read (permissions) is still
+  present: what the synchronizer tracks is decided without reading file contents, so an
+  unreadable file stays a tracked path and never triggers the removal — only a tracked set
+  that is genuinely empty does.

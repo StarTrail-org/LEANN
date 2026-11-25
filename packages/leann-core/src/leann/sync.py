@@ -338,3 +338,7 @@ class FileSynchronizer:
         ) as exc:
             logger.warning("Cannot load sync snapshot %s: %s", self.snapshot_path, exc)
             self.tree = None
+
+    def tracked_paths(self) -> list[str]:
+        """Paths this synchronizer would include right now, using the same rules as the snapshot."""
+        return self._collect_paths()
