@@ -613,13 +613,17 @@ class HFChat(LLMInterface):
         # Load tokenizer and model with timeout protection
         try:
             import signal
+            import threading
 
             def timeout_handler(signum, frame):
                 raise TimeoutError("Model download/loading timed out")
 
-            # Set timeout for model loading (60 seconds)
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(60)
+            # Set timeout for model loading (60 seconds). Signal handlers can only
+            # be installed from the main thread, so other threads load without it.
+            use_alarm = threading.current_thread() is threading.main_thread()
+            if use_alarm:
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(60)
 
             try:
                 logger.info(f"Loading tokenizer for {model_name}...")
@@ -646,8 +650,9 @@ class HFChat(LLMInterface):
                 )
                 logger.info(f"Successfully loaded {model_name}")
             finally:
-                signal.alarm(0)  # Cancel the alarm
-                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
+                if use_alarm:
+                    signal.alarm(0)  # Cancel the alarm
+                    signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
 
         except TimeoutError:
             logger.error(f"Model loading timed out for {model_name}")
