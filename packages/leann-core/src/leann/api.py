@@ -431,6 +431,24 @@ class Fts5BM25Index(BM25Index):
         finally:
             conn.close()
 
+    def update(self, remove_ids: list[str], documents: list[dict[str, Any]]) -> None:
+        """Delete passages by ID and insert new ones, tokenized the way fit() chose."""
+        conn = self._connect()
+        conn.executemany("DELETE FROM bm25_passages WHERE id = ?", ((pid,) for pid in remove_ids))
+        conn.executemany(
+            "INSERT INTO bm25_passages(id, text) VALUES (?, ?)",
+            (
+                (
+                    d["id"],
+                    _CJK_RUN.sub(_fts5_cjk_ngrams, d.get("text", ""))
+                    if self._cjk_ngrams
+                    else d.get("text", ""),
+                )
+                for d in documents
+            ),
+        )
+        conn.commit()
+
     def search(self, query: str, top_k: int = 5) -> list["SearchResult"]:
         # Expand CJK terms to the same n-grams used at index time. Older
         # databases retain their legacy query behaviour via PRAGMA user_version.
@@ -918,6 +936,26 @@ class LeannBuilder:
         with open(offset_file, "wb") as f:
             pickle.dump(offset_map, f)
 
+    @staticmethod
+    def _update_bm25(
+        meta: dict[str, Any],
+        index_dir: Path,
+        remove_ids: list[str],
+        chunks: list[dict[str, Any]],
+    ) -> None:
+        """Apply an update's removals and additions to the index's FTS5 BM25 artifact."""
+        db_name = meta.get("bm25_db")
+        if meta.get("bm25_backend") != "fts5" or not db_name:
+            return
+        db_path = index_dir / db_name
+        if not db_path.exists():
+            return
+        bm25 = Fts5BM25Index(str(db_path))
+        try:
+            bm25.update(remove_ids, chunks)
+        finally:
+            bm25.close()
+
     def update_index(self, index_path: str, remove_passage_ids: Optional[list[str]] = None) -> None:
         """Append new passages and vectors to an existing index (HNSW or IVF).
         For IVF, optional remove_passage_ids removes those ids first (e.g. from file-change API).
@@ -950,6 +988,7 @@ class LeannBuilder:
 
         offset_map = load_offset_map(offset_file)
         existing_ids = set(offset_map.keys())
+        removed_ids: list[str] = []
 
         # IVF: optional delete (for reindex / file-change: remove then re-insert)
         if remove_passage_ids and backend_name == "ivf":
@@ -971,6 +1010,7 @@ class LeannBuilder:
             for pid in remove_passage_ids:
                 offset_map.pop(pid, None)
             existing_ids -= set(remove_passage_ids)
+            removed_ids = list(remove_passage_ids)
 
             # Compact passages.jsonl: rewrite keeping only entries in offset_map
             self._compact_passages(passages_file, offset_file, offset_map)
@@ -979,6 +1019,7 @@ class LeannBuilder:
             meta["total_passages"] = len(offset_map)
             with open(meta_path, "w", encoding="utf-8") as f:
                 json.dump(meta, f, indent=2)
+            self._update_bm25(meta, index_dir, removed_ids, [])
             self.chunks.clear()
             return
 
@@ -1023,6 +1064,7 @@ class LeannBuilder:
             meta["total_passages"] = len(offset_map)
             with open(meta_path, "w", encoding="utf-8") as f:
                 json.dump(meta, f, indent=2)
+            self._update_bm25(meta, index_dir, removed_ids, [])
             self.chunks.clear()
             return
 
@@ -1110,6 +1152,7 @@ class LeannBuilder:
                 with open(offset_file, "wb") as f:
                     pickle.dump(offset_map, f)
                 raise
+            self._update_bm25(meta, index_dir, removed_ids, valid_chunks)
             self.chunks.clear()
             return
 
@@ -1264,6 +1307,7 @@ class LeannBuilder:
         meta["total_passages"] = len(offset_map)
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
+        self._update_bm25(meta, index_dir, [], valid_chunks)
 
         logger.info(
             "Appended %d passages to index '%s'. New total: %d",
