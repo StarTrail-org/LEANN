@@ -2498,6 +2498,23 @@ Examples:
         directories, files, _, _ = self._load_sync_scope(index_dir)
         return directories + files
 
+    def _build_scope_matches_recorded(self, index_dir: Path, args) -> bool:
+        """Whether this run's filter scope is the corpus definition recorded for the index.
+
+        The tracked file set depends not only on the corpus but also on the scope the
+        flags re-derive (--file-types, --include-hidden), so an empty tracked set is
+        evidence that the corpus was deleted only when it matches the recorded scope.
+        A scope that cannot be read (no sync_roots.json, e.g. a very old index) keeps
+        the index: "No documents found" is always safe.
+        """
+        directories, files, extensions, include_hidden = self._load_sync_scope(index_dir)
+        if not directories and not files:
+            return False  # no readable recorded scope: a deletion cannot be confirmed
+        return (
+            set(self._parse_file_types(args.file_types)) == set(extensions)
+            and args.include_hidden == include_hidden
+        )
+
     def _resolve_index_for_watch(self, index_name: str) -> Optional[dict[str, Path]]:
         if self.index_exists(index_name):
             index_dir = self.indexes_dir / index_name
@@ -2840,6 +2857,43 @@ Examples:
                 docs_paths, args.file_types, include_hidden=args.include_hidden, args=args
             )
         if not all_texts:
+            # Nothing loaded. Three cases land here: every tracked file was deleted from
+            # disk — the surviving artifacts would keep serving deleted passages, so drop
+            # them — versus files that still exist but yielded no text, where the index is
+            # still valid and must be kept — versus a corpus this build never observed: a
+            # --docs path that does not exist leaves no synchronizer at all, and a root
+            # without a previous snapshot has nothing to compare against. Deletion must be
+            # observed, never inferred: the evidence is "no tracked path", and
+            # tracked_paths() applies the same membership rules the snapshot uses without
+            # reading file contents — a file that still exists but cannot be read
+            # (permissions) is still a tracked path, so it can never trigger the drop. An
+            # empty synchronizer list makes all() vacuously true, and a snapshot-less root
+            # tracking zero files says nothing about the indexed corpus, so both must fall
+            # through to "No documents found". The tracked set also depends on the build
+            # scope the flags re-derive: a --file-types / --include-hidden value that
+            # matches nothing empties it while every indexed file is still on disk, so the
+            # scope must also be the one the index was built from (see
+            # _build_scope_matches_recorded).
+            if (
+                synchronizers
+                and _existing_index_artifacts(index_dir)
+                and all(fs.tree is not None and not fs.tracked_paths() for fs in synchronizers)
+                and self._build_scope_matches_recorded(index_dir, args)
+            ):
+                import shutil
+
+                # Remove the same directory `leann remove` deletes, then recreate it so
+                # the committed snapshots and sync config record the now-empty corpus
+                # and the next build starts from that state instead of repeating this.
+                shutil.rmtree(index_dir)
+                index_dir.mkdir(parents=True)
+                self._commit_synchronizers(synchronizers)
+                self._write_sync_config_for_docs(index_dir, docs_paths, args, build_config)
+                print(
+                    f"Removed index '{index_name}' because every indexed file was deleted "
+                    f"({index_dir}); `leann remove {index_name}` is the manual equivalent."
+                )
+                return
             print("No documents found")
             return
 
