@@ -993,10 +993,12 @@ class LeannBuilder:
         distance_metric = meta_backend_kwargs.get(
             "distance_metric", self.backend_kwargs.get("distance_metric", "mips")
         ).lower()
+        # The metadata records whether the index file keeps its embeddings, and HNSWSearcher
+        # opens the file by that record. This builder's is_recompute (``leann build`` passes
+        # --recompute, on by default) must not decide it: pruning an index recorded as unpruned
+        # leaves a file that every search crashes on.
         needs_recompute = bool(
-            meta.get("is_pruned")
-            or meta_backend_kwargs.get("is_recompute")
-            or self.backend_kwargs.get("is_recompute")
+            meta.get("is_pruned", meta_backend_kwargs.get("is_recompute", False))
         )
 
         valid_chunks: list[dict[str, Any]] = []
