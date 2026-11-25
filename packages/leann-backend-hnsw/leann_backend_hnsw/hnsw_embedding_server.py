@@ -219,6 +219,7 @@ def create_hnsw_embedding_server(
                 model_name,
                 mode=embedding_mode,
                 provider_options=PROVIDER_OPTIONS,
+                is_query=True,
             )
             rep_socket.send(msgpack.packb(embeddings.tolist()))
             e2e_end = time.time()

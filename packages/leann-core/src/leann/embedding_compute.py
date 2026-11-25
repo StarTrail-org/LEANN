@@ -461,6 +461,8 @@ def compute_embeddings(
     manual_tokenize: bool = False,
     max_length: int = 512,
     provider_options: Optional[dict[str, Any]] = None,
+    *,
+    is_query: bool = False,
 ) -> np.ndarray:
     """
     Unified embedding computation entry point
@@ -472,6 +474,7 @@ def compute_embeddings(
         is_build: Whether this is a build operation (shows progress bar)
         batch_size: Batch size for processing
         adaptive_optimization: Whether to use adaptive optimization based on batch size
+        is_query: Whether the texts are search queries (used by Gemini)
 
     Returns:
         Normalized embeddings array, shape: (len(texts), embedding_dim)
@@ -526,7 +529,7 @@ def compute_embeddings(
             provider_options=provider_options,
         )
     elif mode == "gemini":
-        return compute_embeddings_gemini(texts, model_name, is_build=is_build)
+        return compute_embeddings_gemini(texts, model_name, is_build=is_build, is_query=is_query)
     else:
         raise ValueError(f"Unsupported embedding mode: {mode}")
 
@@ -1460,7 +1463,11 @@ def compute_embeddings_ollama(
 
 
 def compute_embeddings_gemini(
-    texts: list[str], model_name: str = "text-embedding-004", is_build: bool = False
+    texts: list[str],
+    model_name: str = "text-embedding-004",
+    is_build: bool = False,
+    *,
+    is_query: bool = False,
 ) -> np.ndarray:
     """
     Compute embeddings using Google Gemini API.
@@ -1468,7 +1475,8 @@ def compute_embeddings_gemini(
     Args:
         texts: List of texts to compute embeddings for
         model_name: Gemini model name (default: "text-embedding-004")
-        is_build: Whether this is a build operation (shows progress bar)
+        is_build: Whether this is a build operation
+        is_query: Whether the texts are search queries
 
     Returns:
         Embeddings array, shape: (len(texts), embedding_dim)
@@ -1513,6 +1521,7 @@ def compute_embeddings_gemini(
         # Fallback when tqdm is not available
         batch_iterator = range(0, len(texts), max_batch_size)
 
+    task_type = "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
     for i in batch_iterator:
         batch_texts = texts[i : i + max_batch_size]
 
@@ -1521,9 +1530,7 @@ def compute_embeddings_gemini(
             response = client.models.embed_content(
                 model=model_name,
                 contents=batch_texts,
-                config=genai.types.EmbedContentConfig(
-                    task_type="RETRIEVAL_DOCUMENT"  # For document embedding
-                ),
+                config=genai.types.EmbedContentConfig(task_type=task_type),
             )
 
             # Extract embeddings from response
