@@ -8,7 +8,6 @@ import logging
 import os
 import pickle
 import re
-import subprocess
 import time
 import warnings
 from abc import ABC, abstractmethod
@@ -1747,53 +1746,35 @@ class LeannSearcher:
         return shards
 
     def _grep_search(self, query: str, top_k: int = 5) -> list[SearchResult]:
-        """Perform grep-based search on raw passages"""
+        """Search the decoded passage text for a case-insensitive literal query."""
         jsonl_files = self._passage_jsonl_files()
         if not jsonl_files:
             raise FileNotFoundError("No .jsonl passages file found for grep search")
 
+        normalized_query = query.lower()
         matches = []
-        try:
-            for jsonl_file in jsonl_files:
-                # grep prefixes "file:line:" across files, so grep each shard separately.
-                cmd = ["grep", "-i", "-n", query, jsonl_file]
-                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-
-                if result.returncode == 1:
-                    continue
-                elif result.returncode != 0:
-                    raise RuntimeError(f"Grep failed: {result.stderr}")
-
-                for line in result.stdout.strip().split("\n"):
-                    if not line:
-                        continue
-                    parts = line.split(":", 1)
-                    if len(parts) != 2:
-                        continue
-
+        for jsonl_file in jsonl_files:
+            with open(jsonl_file, encoding="utf-8") as passage_file:
+                for line_number, line in enumerate(passage_file, start=1):
                     try:
-                        data = json.loads(parts[1])
-                        text = data.get("text", "")
-                        score = text.lower().count(query.lower())
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
 
+                    text = data.get("text", "")
+                    score = text.lower().count(normalized_query)
+                    if score:
                         matches.append(
                             SearchResult(
-                                id=data.get("id", parts[0]),
+                                id=data.get("id", str(line_number)),
                                 text=text,
                                 metadata=data.get("metadata", {}),
                                 score=float(score),
                             )
                         )
-                    except json.JSONDecodeError:
-                        continue
 
-            matches.sort(key=lambda x: x.score, reverse=True)
-            return matches[:top_k]
-
-        except FileNotFoundError:
-            raise RuntimeError(
-                "grep command not found. Please install grep or use semantic search."
-            )
+        matches.sort(key=lambda x: x.score, reverse=True)
+        return matches[:top_k]
 
     def cleanup(self):
         """Explicitly cleanup embedding server and backend index resources.
