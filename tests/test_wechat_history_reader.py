@@ -1,47 +1,20 @@
-import importlib.util
+"""Regression tests for the WeChat reader that `leann index-wechat` actually runs.
+
+`cli.py:index_wechat` imports `apps.history_data.wechat_history.WeChatHistoryReader`,
+so that is the class under test here. The copy in
+`packages/leann-core/src/leann/readers.py` has no importer.
+"""
+
 import json
 import sys
-import types
 from pathlib import Path
-from typing import Any
 
 import pytest
 
+# Add the parent directory to the path so we can import from apps
+sys.path.append(str(Path(__file__).parent.parent))
 
-def _stub_module(name: str) -> Any:
-    """A stand-in module object whose attributes are set dynamically below."""
-    return types.ModuleType(name)
-
-
-try:
-    from llama_index.core import Document as _Document
-except ModuleNotFoundError:
-    llama_index = _stub_module("llama_index")
-    llama_index_core = _stub_module("llama_index.core")
-    llama_index_readers = _stub_module("llama_index.core.readers")
-    llama_index_base = _stub_module("llama_index.core.readers.base")
-
-    class _Document:
-        def __init__(self, text, metadata):
-            self.text = text
-            self.metadata = metadata
-
-    class _BaseReader:
-        pass
-
-    llama_index_core.Document = _Document
-    llama_index_base.BaseReader = _BaseReader
-    sys.modules["llama_index"] = llama_index
-    sys.modules["llama_index.core"] = llama_index_core
-    sys.modules["llama_index.core.readers"] = llama_index_readers
-    sys.modules["llama_index.core.readers.base"] = llama_index_base
-
-readers_path = Path(__file__).parents[1] / "packages/leann-core/src/leann/readers.py"
-readers_spec = importlib.util.spec_from_file_location("leann_readers", readers_path)
-assert readers_spec is not None and readers_spec.loader is not None
-readers = importlib.util.module_from_spec(readers_spec)
-readers_spec.loader.exec_module(readers)
-WeChatHistoryReader = readers.WeChatHistoryReader
+from apps.history_data.wechat_history import WeChatHistoryReader
 
 
 @pytest.mark.parametrize(
@@ -93,7 +66,9 @@ def test_load_data_keeps_colons_in_message_body(tmp_path):
         encoding="utf-8",
     )
 
-    docs = WeChatHistoryReader().load_data(str(export_dir))
+    docs = WeChatHistoryReader().load_data(
+        wechat_export_dir=str(export_dir), concatenate_messages=True
+    )
 
     assert len(docs) == 1
     text = docs[0].text
