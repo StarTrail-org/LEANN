@@ -128,7 +128,9 @@ class WeChatHistoryReader(BaseReader):
 
         # Remove common prefixes like "wxid_xxx:\n"
         clean_content = re.sub(r"^wxid_[^:]+:\s*", "", content)
-        clean_content = re.sub(r"^[^:]+:\s*", "", clean_content)
+        # Do not strip a generic "^word:" prefix here: the exporter writes message
+        # bodies straight into `content`, so a leading colon prefix is ordinary text
+        # ("Reminder: buy milk" -> "buy milk", "Note:" -> "").
 
         # If it's just XML or system message, return empty
         if clean_content.strip().startswith("<") or "recalled a message" in clean_content:
@@ -186,10 +188,10 @@ class WeChatHistoryReader(BaseReader):
         if "recalled a message" in content:
             return False
 
-        # Check if there's actual readable text (not just XML or system messages)
         # Remove common prefixes like "wxid_xxx:\n" and check for actual content
         clean_content = re.sub(r"^wxid_[^:]+:\s*", "", content)
-        clean_content = re.sub(r"^[^:]+:\s*", "", clean_content)
+        # Same as _extract_readable_text: a generic "^word:" strip would empty
+        # messages like "Note:" and drop them from the index.
 
         # If after cleaning we have meaningful text, consider it readable
         if len(clean_content.strip()) > 0 and not clean_content.strip().startswith("<"):

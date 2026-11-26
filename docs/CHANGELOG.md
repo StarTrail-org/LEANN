@@ -288,3 +288,18 @@ dropped and the wheel floor moved with it.
   hardcoded file, so multi-shard indexes no longer drop matches.
 - Nothing that worked before stops working: an index named `documents` resolves the same
   file as before, and a genuinely missing passages file still raises the same error.
+
+## 2026-11-27: WeChat indexing keeps colons in message bodies
+
+- The `WeChatHistoryReader` in `apps/history_data/wechat_history.py` — the copy that
+  `leann index-wechat` and `apps/wechat_rag.py` import — still stripped any leading `word:`
+  prefix from message content. Any caller that resolved an export directory indexed
+  `Reminder: buy milk tomorrow` as `buy milk tomorrow`, `10:30 meeting at noon` as
+  `30 meeting at noon`, and turned `Note:` into the empty string, so `_is_text_message`
+  dropped the message entirely.
+- #465 fixed this strip only in the unimported duplicate `WeChatHistoryReader` inside
+  `packages/leann-core/src/leann/readers.py` (the 2026-11-17 entry above describes that copy,
+  which no code imports), and the regression test loaded that copy by path, so it stayed
+  green while the shipped reader stayed broken.
+- The live reader now strips only a `wxid_…:` prefix, the duplicate class is deleted, and the
+  test imports the reader that both entry points construct.
