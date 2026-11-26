@@ -63,24 +63,9 @@ configs = searcher.search("server_port=", use_grep=True)
 
 ### How It Works
 
-1. **File Location**: Grep search operates on the raw text stored in `.jsonl` files
-2. **Command Execution**: Uses the system `grep` command with case-insensitive search
-3. **Result Processing**: Parses JSON lines and extracts text and metadata
-4. **Scoring**: Simple frequency-based scoring based on query term occurrences
-
-### Search Process
-
-```
-Query: "def train_model"
-  ↓
-grep -i -n "def train_model" documents.leann.passages.jsonl
-  ↓
-Parse matching JSON lines
-  ↓
-Calculate scores based on term frequency
-  ↓
-Return top_k results
-```
+1. Read each passage JSONL shard declared by the index.
+2. Decode each JSON line and look for the query as a case-insensitive literal in the passage text.
+3. Rank matching passages by occurrence count and return up to `top_k` results.
 
 ### Scoring Algorithm
 
@@ -94,16 +79,6 @@ Results are ranked by score (highest first), with higher scores indicating more 
 ## Error Handling
 
 ### Common Issues
-
-#### Grep Command Not Found
-```
-RuntimeError: grep command not found. Please install grep or use semantic search.
-```
-
-**Solution**: Install grep on your system:
-- **Ubuntu/Debian**: `sudo apt-get install grep`
-- **macOS**: grep is pre-installed
-- **Windows**: Use WSL or install grep via Git Bash/MSYS2
 
 #### No Results Found
 ```python
