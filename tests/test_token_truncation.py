@@ -267,6 +267,55 @@ class TestTokenTruncation:
             f"Should be ≤{target_tokens} tokens, got {result_tokens}"
         )
 
+    def test_truncate_literal_special_token_under_limit(self):
+        """Verify a literal special-token spelling does not raise.
+
+        A document containing the literal text "<|endoftext|>" (e.g. a
+        tokenizer tutorial or pasted chat log) must be encoded as ordinary
+        text, not rejected: tiktoken defaults to disallowed_special="all",
+        which raises ValueError and would abort the whole embedding batch.
+        """
+        text = "<|endoftext|>"
+        result = truncate_to_token_limit([text], token_limit=2048)
+
+        assert len(result) == 1, "Should return same number of texts"
+        assert result[0] == text, "Literal special-token text should be unchanged"
+
+    def test_truncate_literal_special_token_over_limit(self, tokenizer):
+        """Verify long text with literal special-token spellings truncates.
+
+        The same spelling repeated past the token limit must truncate
+        cleanly to the limit instead of raising ValueError.
+        """
+        text = "<|endoftext|> " * 20  # 122 tokens with disallowed_special=()
+        original_token_count = len(tokenizer.encode(text, disallowed_special=()))
+        assert original_token_count == 122, (
+            f"Test setup: text should be 122 tokens (has {original_token_count})"
+        )
+
+        result = truncate_to_token_limit([text], token_limit=16)
+
+        assert len(result) == 1, "Should return same number of texts"
+        assert result[0] == "<|endoftext|> <|endoftext|> <|endoft", (
+            "Should truncate to the first 16 tokens of literal text"
+        )
+        truncated_token_count = len(tokenizer.encode(result[0], disallowed_special=()))
+        assert truncated_token_count == 16, (
+            f"Truncated text should be 16 tokens, got {truncated_token_count}"
+        )
+
+    def test_truncate_mixed_text_with_literal_special_token(self):
+        """Verify ordinary text mentioning a special token stays verbatim.
+
+        A short sentence that merely mentions "<|endoftext|>" is within
+        the limit and must be returned unchanged.
+        """
+        text = "A tokenizer example: <|endoftext|> is literal."
+        result = truncate_to_token_limit([text], token_limit=2048)
+
+        assert len(result) == 1, "Should return same number of texts"
+        assert result[0] == text, "Mixed text with literal token should be unchanged"
+
 
 class TestLMStudioHybridDiscovery:
     """Tests for LM Studio integration in get_model_token_limit() hybrid discovery.
