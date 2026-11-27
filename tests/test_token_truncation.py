@@ -299,9 +299,7 @@ class TestTokenTruncation:
         assert result[0] == "<|endoftext|> <|endoftext|> <|endoft", (
             "Should truncate to the first 16 tokens of literal text"
         )
-        truncated_token_count = len(
-            tokenizer.encode(result[0], disallowed_special=())
-        )
+        truncated_token_count = len(tokenizer.encode(result[0], disallowed_special=()))
         assert truncated_token_count == 16, (
             f"Truncated text should be 16 tokens, got {truncated_token_count}"
         )
