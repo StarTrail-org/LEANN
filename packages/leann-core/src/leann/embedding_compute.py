@@ -165,7 +165,12 @@ def truncate_to_token_limit(texts: list[str], token_limit: int) -> list[str]:
     max_original_length = 0
 
     for i, text in enumerate(texts):
-        tokens = enc.encode(text)
+        # Encode literal special-token spellings (e.g. "<|endoftext|>") as
+        # ordinary text: tiktoken defaults to disallowed_special="all", which
+        # raises ValueError on such spellings and would abort the whole
+        # embedding batch. The chunking side already passes
+        # disallowed_special=() (see chunking_utils.py).
+        tokens = enc.encode(text, disallowed_special=())
         original_length = len(tokens)
 
         if original_length <= token_limit:
